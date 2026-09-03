@@ -1,6 +1,7 @@
 export type EventSource =
   | "github"
   | "home"
+  | "local"
   | "mail"
   | "wire"
   | "calendar"
@@ -104,6 +105,9 @@ export type NamedAi = {
   id: string;
   name: string;
   aliases: string[];
+  running?: boolean;
+  runningSince?: string;
+  runningFrom?: "hand" | "local";
 };
 
 export type AiSystem = {
@@ -112,6 +116,7 @@ export type AiSystem = {
   aliases: string[];
   origin: "scan" | "named";
   tracking: boolean;
+  running: boolean;
   eventCount: number;
   lastAt?: string;
   lastSummary?: string;
