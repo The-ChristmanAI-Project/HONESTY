@@ -1,0 +1,18 @@
+HONESTY LOCAL
+above all else
+
+This program runs on the home station. It is not a website.
+It reads the process list on THIS computer and stays on any
+named AI desktop program that is running.
+
+Mac: double-click "Start Honesty.command"
+Windows: double-click "Start Honesty.bat"
+
+Python 3 must be installed. No account. No paywall. The ledger
+is written next to this file as honesty-ledger.json.
+
+It can see desktop Claude, Cursor, Copilot, ChatGPT app, Ollama,
+LM Studio, Grok if they are programs. A tab in Chrome is not a
+separate program. That is the operating system, not a lock.
+
+Yours.
