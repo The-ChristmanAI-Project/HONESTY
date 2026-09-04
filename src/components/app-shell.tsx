@@ -1,6 +1,7 @@
 import { Link, useRouterState } from "@tanstack/react-router";
 import { Ellipsis, FileText, Home, MessageSquare, Radar, ScrollText, Settings2, Users } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
+import { FamilySplash } from "@/components/family-splash";
 import { canPickFolder, hasFolder, scanFolder } from "@/lib/folder-watch";
 import { pullTheRecord, pullTheWire } from "@/lib/pull";
 import { useStation } from "@/lib/store";
@@ -78,6 +79,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   return (
     <div className="min-h-dvh overflow-x-hidden bg-bg text-fg">
+      <FamilySplash />
       <a
         href="#main"
         className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-md focus:bg-accent focus:px-3 focus:py-2 focus:text-accent-fg"
@@ -207,8 +209,16 @@ function Brand({
         className={cn("block rounded-full", armed ? "pulse-dot" : "size-2 bg-subtle")}
         aria-hidden="true"
       />
+      <img
+        src="/family/family.jpg"
+        alt="Honesty above all else. The family."
+        className={cn(
+          "rounded-md border border-border object-cover",
+          compact ? "size-10" : "size-14",
+        )}
+      />
       <div>
-        <p className="font-display text-lg leading-none tracking-tight">Honesty</p>
+        <p className="font-display text-lg leading-none tracking-tight text-accent">Honesty</p>
         {!compact ? (
           <>
             <p className="mt-1 font-display text-sm italic text-muted">above all else</p>
