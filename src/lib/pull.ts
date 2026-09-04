@@ -1,4 +1,5 @@
 import { pullStation } from "./github.fn";
+import { pullLocal } from "./local-agent";
 import { pullWire } from "./wire.fn";
 import { readToken, useStation } from "./store";
 
@@ -6,6 +7,7 @@ export async function pullTheRecord() {
   const { settings, events, setPulling, applyPull } = useStation.getState();
   setPulling(true);
   try {
+    await pullLocal();
     const knownShas = events
       .map((event) => event.sha)
       .filter((sha): sha is string => Boolean(sha))
