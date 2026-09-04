@@ -38,6 +38,9 @@ export type StationState = {
   mailLoginRequired: boolean;
   pullingMail: boolean;
   wireSources: WireSourceStatus[];
+  localSeated: boolean;
+  localMachine: string | null;
+  localPlatform: string | null;
   settings: StationSettings;
   namedAis: NamedAi[];
   knownActors: string[];
@@ -69,6 +72,20 @@ export type StationState = {
   addEvent: (event: AccessEvent) => void;
   addAi: (name: string, aliases?: string) => void;
   removeAi: (id: string) => void;
+  setAiRunning: (id: string, running: boolean) => void;
+  applyLocal: (input: {
+    machine: string;
+    platform: string;
+    running: { name: string }[];
+    events: AccessEvent[];
+  }) => void;
+  applyConductor: (feed: {
+    machine?: string;
+    platform?: string;
+    running?: { name: string }[];
+    ledger?: { at: string; kind: string; name: string; summary: string }[];
+  }) => void;
+  markLocalGone: () => void;
   addKnown: (login: string) => void;
   removeKnown: (login: string) => void;
   addWatch: (path: string, note: string) => void;
@@ -110,11 +127,19 @@ export const useStation = create<StationState>()(
       mailLoginRequired: false,
       pullingMail: false,
       wireSources: [],
+      localSeated: false,
+      localMachine: null,
+      localPlatform: null,
       settings: defaultSettings,
       namedAis: [
-        { id: "ai-grok", name: "Grok", aliases: ["grok", "xai"] },
-        { id: "ai-copilot", name: "Copilot", aliases: ["copilot", "copilot-swe-agent", "github-copilot"] },
-        { id: "ai-claude", name: "Claude", aliases: ["claude", "anthropic"] },
+        { id: "ai-grok", name: "Grok", aliases: ["grok", "xai"], running: false },
+        {
+          id: "ai-copilot",
+          name: "Copilot",
+          aliases: ["copilot", "copilot-swe-agent", "github-copilot"],
+          running: false,
+        },
+        { id: "ai-claude", name: "Claude", aliases: ["claude", "anthropic"], running: false },
       ],
       knownActors: ["EverettNC"],
       watches: [
@@ -170,12 +195,101 @@ export const useStation = create<StationState>()(
                 id: `ai-${Date.now().toString(36)}`,
                 name: clean,
                 aliases: extra.length ? extra : [clean],
+                running: false,
               },
             ],
           };
         }),
       removeAi: (id) =>
         set((state) => ({ namedAis: state.namedAis.filter((ai) => ai.id !== id) })),
+      setAiRunning: (id, running) =>
+        set((state) => ({
+          namedAis: state.namedAis.map((ai) =>
+            ai.id === id
+              ? {
+                  ...ai,
+                  running,
+                  runningFrom: running ? "hand" : undefined,
+                  runningSince: running ? new Date().toISOString() : undefined,
+                }
+              : ai,
+          ),
+        })),
+      applyLocal: ({ machine, platform, running, events }) =>
+        set((state) => {
+          const names = new Set(running.map((row) => row.name.trim().toLowerCase()).filter(Boolean));
+          const namedAis: NamedAi[] = state.namedAis.map((ai) => {
+            if (names.has(ai.name.toLowerCase())) {
+              return {
+                ...ai,
+                running: true,
+                runningFrom: "local",
+                runningSince: ai.runningSince ?? new Date().toISOString(),
+              };
+            }
+            if (ai.runningFrom === "local") {
+              return { ...ai, running: false, runningFrom: undefined };
+            }
+            return ai;
+          });
+          for (const row of running) {
+            const clean = row.name.trim();
+            if (!clean) continue;
+            if (namedAis.some((ai) => ai.name.toLowerCase() === clean.toLowerCase())) continue;
+            namedAis.push({
+              id: `ai-local-${clean.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`,
+              name: clean,
+              aliases: [clean],
+              running: true,
+              runningFrom: "local",
+              runningSince: new Date().toISOString(),
+            });
+          }
+          return {
+            localSeated: true,
+            localMachine: machine,
+            localPlatform: platform,
+            namedAis,
+            events: mergeEvents(state.events, events),
+          };
+        }),
+      applyConductor: (feed) =>
+        set((state) => {
+          const running = feed.running ?? [];
+          const events = (feed.ledger ?? []).map((item) => ({
+            id: `local-${item.kind}-${item.name}-${item.at}`,
+            at: item.at,
+            kind: (item.kind === "stop" ? "other" : "open") as AccessEvent["kind"],
+            source: "local" as const,
+            actorLogin: item.name,
+            files: [] as string[],
+            summary: item.summary,
+          }));
+          const names = new Set(running.map((row) => row.name.trim().toLowerCase()).filter(Boolean));
+          const namedAis: NamedAi[] = state.namedAis.map((ai) => {
+            if (names.has(ai.name.toLowerCase())) {
+              return { ...ai, running: true, runningFrom: "local" };
+            }
+            if (ai.runningFrom === "local") {
+              return { ...ai, running: false, runningFrom: undefined };
+            }
+            return ai;
+          });
+          return {
+            localSeated: true,
+            localMachine: feed.machine ?? state.localMachine,
+            localPlatform: feed.platform ?? state.localPlatform,
+            namedAis,
+            events: mergeEvents(state.events, events),
+          };
+        }),
+      markLocalGone: () =>
+        set((state) => ({
+          localSeated: false,
+          namedAis: state.namedAis.map((ai) =>
+            ai.runningFrom === "local" ? { ...ai, running: false, runningFrom: undefined } : ai,
+          ),
+        })),
       addKnown: (login) =>
         set((state) => {
           const clean = login.trim().replace(/^@/, "");
