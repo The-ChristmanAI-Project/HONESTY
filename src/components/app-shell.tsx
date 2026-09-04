@@ -95,6 +95,15 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   const moreActive = MOBILE_MORE.includes(pathname as (typeof MOBILE_MORE)[number]);
 
+  if (pathname === "/conductor") {
+    return (
+      <div className="min-h-dvh overflow-x-hidden bg-cd-bg text-cd-fg">
+        {introOpen ? <Intro onDone={() => setIntroOpen(false)} /> : null}
+        {children}
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-dvh overflow-x-hidden bg-bg text-fg">
       {introOpen ? <Intro onDone={() => setIntroOpen(false)} /> : null}
