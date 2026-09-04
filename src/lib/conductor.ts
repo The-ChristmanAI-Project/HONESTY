@@ -1,6 +1,8 @@
 import { probeLocal, type LocalSnapshot } from "./local-agent";
 
-export const CONDUCTOR_LOCAL = "http://127.0.0.1:8787";
+export const LOCAL_BIND = "127.0.0.1:8787";
+export const DESK_BIND = "0.0.0.0:8788";
+export const CONDUCTOR_LOCAL = `http://${LOCAL_BIND}`;
 export const CONDUCTOR_CHANNEL = "honesty-conductor";
 
 export type ConductorStatus = "clean" | "review" | "blocked" | "empty" | "dark";

@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState, type FormEvent } from "react";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/page-header";
@@ -129,6 +129,20 @@ function StationPage() {
           </label>
           <Button type="submit">Save station</Button>
         </form>
+      </Panel>
+
+      <Panel className="mt-6">
+        <h2 className="text-xl">Provider keys</h2>
+        <p className="mt-2 text-sm text-muted">
+          NVIDIA, Ollama, AWS, OpenAI, Anthropic sit on Keys. Drop a file there. This browser
+          only. Not the GitHub token below.
+        </p>
+        <Link
+          to="/keys"
+          className="mt-4 inline-flex min-h-11 items-center text-sm text-muted hover:text-fg"
+        >
+          Open the keys drop
+        </Link>
       </Panel>
 
       <Panel className="mt-6">

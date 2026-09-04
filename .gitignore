@@ -3,3 +3,8 @@ node_modules/
 .github_repo
 .env
 .env.*
+.DS_Store
+honesty-local/honesty-ledger.json
+honesty-local/conductor-hook.json
+honesty-local/conductor-outbox.json
+honesty-local/*.json.tmp
