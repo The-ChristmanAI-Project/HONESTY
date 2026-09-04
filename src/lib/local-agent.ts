@@ -10,6 +10,14 @@ export type LocalProcess = {
   pids: string[];
 };
 
+export type LocalSeen = {
+  name: string;
+  firstAt?: string;
+  lastAt: string;
+  count?: number;
+  pids?: string[];
+};
+
 export type LocalLedgerItem = {
   at: string;
   kind: string;
@@ -22,6 +30,7 @@ export type LocalSnapshot = {
   platform: string;
   machine: string;
   running: LocalProcess[];
+  seen?: LocalSeen[];
   ledger: LocalLedgerItem[];
   last_scan: string | null;
   note?: string;
