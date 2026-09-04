@@ -226,7 +226,7 @@ function Brand({
       <span className="relative shrink-0">
         <img
           src="/family/family.jpg"
-          alt=""
+          alt="Honesty above all else. The family."
           className={cn(
             "rounded-sm object-cover ring-1 ring-accent/40",
             compact ? "size-10" : "size-12",
@@ -241,7 +241,7 @@ function Brand({
         />
       </span>
       <div>
-        <p className="font-display text-lg leading-none tracking-tight">Honesty</p>
+        <p className="font-display text-lg leading-none tracking-tight text-accent">Honesty</p>
         {!compact ? (
           <>
             <p className="mt-1 font-display text-sm italic text-muted">above all else</p>

@@ -1,4 +1,4 @@
-import { createRootRoute, HeadContent, Outlet, Scripts } from "@tanstack/react-router";
+import { createRootRoute, HeadContent, Link, Outlet, Scripts } from "@tanstack/react-router";
 import { AuthProvider } from "@/lib/auth/provider";
 import { PreviewHostBridge } from "@/components/preview-host-bridge";
 import { AppShell } from "@/components/app-shell";
@@ -6,6 +6,24 @@ import { Toaster } from "sonner";
 import appCss from "../styles.css?url";
 
 const APP_NAME = "Honesty Above All Else";
+
+function NotFoundPage() {
+  return (
+    <div className="mx-auto max-w-xl py-16 text-center">
+      <p className="kicker">Missing page</p>
+      <h1 className="mt-3 font-display text-3xl tracking-tight">This desk has no such room.</h1>
+      <p className="mt-3 text-sm text-muted">
+        Honesty is open source from The Christman AI Project. The page you opened is not on the
+        board. Desk, Ledger, Wire, AIs, People, Reports, Station, and Conductor are.
+      </p>
+      <p className="mt-6">
+        <Link to="/" className="text-accent underline underline-offset-4">
+          Back to the desk
+        </Link>
+      </p>
+    </div>
+  );
+}
 
 export const Route = createRootRoute({
   head: () => ({
@@ -17,7 +35,7 @@ export const Route = createRootRoute({
       {
         name: "description",
         content:
-          "communications ledger for the home station — mail, calls, texts, meetings, GitHub — kept without spin. No paywall.",
+          "communications ledger for the home station — mail, calls, texts, meetings, GitHub — kept without spin. Given away. No paywall.",
       },
     ],
     links: [
@@ -33,6 +51,7 @@ export const Route = createRootRoute({
       { rel: "apple-touch-icon", href: "/__grok/icon-180.png" },
     ],
   }),
+  notFoundComponent: NotFoundPage,
   component: () => (
     <html lang="en" className="antialiased" suppressHydrationWarning>
       <head>
