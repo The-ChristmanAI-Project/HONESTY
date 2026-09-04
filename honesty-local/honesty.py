@@ -277,7 +277,13 @@ def main():
     threading.Thread(target=loop, daemon=True).start()
     httpd = ThreadingHTTPServer((HOST, PORT), Handler)
     url = f"http://{HOST}:{PORT}"
-    sys.stderr.write(f"Honesty Local is on this computer.\n{url}\nConductor rail: {url}/conductor\nYours. No paywall.\n")
+    sys.stderr.write(
+        f"Honesty Local is on this computer.\n"
+        f"Local bind {HOST}:{PORT}\n"
+        f"Desk bind 0.0.0.0:8788\n"
+        f"Conductor rail: {url}/conductor\n"
+        f"Yours. No paywall.\n"
+    )
     try: webbrowser.open(f"{url}/conductor" if "--conductor" in sys.argv else url)
     except Exception: pass
     try: httpd.serve_forever()

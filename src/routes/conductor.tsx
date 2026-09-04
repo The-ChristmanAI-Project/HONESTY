@@ -2,6 +2,8 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import {
+  DESK_BIND,
+  LOCAL_BIND,
   pullConductorFeed,
   publishConductor,
   type ConductorStatus,
@@ -155,11 +157,16 @@ function ConductorPage() {
             </p>
           </div>
           <div className="hidden h-10 w-px bg-cd-line sm:block" />
-          <p className="hidden items-center gap-2 font-cd-mono text-[11px] sm:flex">
-            <span className="inline-block size-1.5 animate-pulse rounded-full bg-cd-cyan" />
-            <span className="text-cd-mute">CYCLE {cycle}</span>
-            <span className="text-cd-mute/50">/</span>
-            <span className="text-cd-mute">{localSeated ? "Honesty Local seated" : "Local quiet"}</span>
+          <p className="flex flex-col gap-1 font-cd-mono text-[11px] sm:flex-row sm:items-center sm:gap-2">
+            <span className="inline-flex items-center gap-2">
+              <span className="inline-block size-1.5 animate-pulse rounded-full bg-cd-cyan" />
+              <span className="text-cd-mute">CYCLE {cycle}</span>
+            </span>
+            <span className="text-cd-cyan">{LOCAL_BIND}</span>
+            <span className="text-cd-mute/50">Local</span>
+            <span className="text-cd-cyan">{DESK_BIND}</span>
+            <span className="text-cd-mute/50">Desk</span>
+            <span className="text-cd-mute">{localSeated ? "seated" : "quiet"}</span>
           </p>
         </div>
         <nav className="flex flex-wrap items-center gap-2 py-2" aria-label="Conductor">

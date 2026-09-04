@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import { Intro, introAlreadyPlayed } from "@/components/intro";
+import { DESK_BIND, LOCAL_BIND } from "@/lib/conductor";
 import { canPickFolder, hasFolder, scanFolder } from "@/lib/folder-watch";
 import { pullTheRecord, pullTheWire } from "@/lib/pull";
 import { useStation } from "@/lib/store";
@@ -122,8 +123,11 @@ export function AppShell({ children }: { children: ReactNode }) {
             ))}
           </nav>
           <p className="mt-auto pt-8 font-mono text-2xs leading-relaxed text-subtle">
-            Yours. Arm Honesty to scan for AI systems in the record and follow each one. Not a
-            paywall. Not a kernel.
+            Local {LOCAL_BIND}
+            <br />
+            Desk {DESK_BIND}
+            <br />
+            Yours. Not a paywall. Not a kernel.
           </p>
         </aside>
 
