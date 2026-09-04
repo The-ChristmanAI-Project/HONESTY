@@ -1,7 +1,19 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import { Ellipsis, FileText, Home, MessageSquare, Radar, ScrollText, Settings2, Users } from "lucide-react";
+import {
+  Ellipsis,
+  FileText,
+  Home,
+  KeyRound,
+  MessageSquare,
+  Radio,
+  Radar,
+  ScrollText,
+  Settings2,
+  Users,
+} from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
-import { FamilySplash } from "@/components/family-splash";
+import { Intro, introAlreadyPlayed } from "@/components/intro";
+import { DESK_BIND, LOCAL_BIND } from "@/lib/conductor";
 import { canPickFolder, hasFolder, scanFolder } from "@/lib/folder-watch";
 import { pullTheRecord, pullTheWire } from "@/lib/pull";
 import { useStation } from "@/lib/store";
@@ -12,13 +24,15 @@ const NAV = [
   { to: "/ledger", label: "Ledger", icon: FileText },
   { to: "/wire", label: "Wire", icon: MessageSquare },
   { to: "/systems", label: "AIs", icon: Radar },
+  { to: "/conductor", label: "Conductor", icon: Radio },
+  { to: "/keys", label: "Keys", icon: KeyRound },
   { to: "/people", label: "People", icon: Users },
   { to: "/reports", label: "Reports", icon: ScrollText },
   { to: "/station", label: "Station", icon: Settings2 },
 ] as const;
 
-const MOBILE_PRIMARY = ["/", "/wire", "/ledger", "/systems"] as const;
-const MOBILE_MORE = ["/people", "/reports", "/station"] as const;
+const MOBILE_PRIMARY = ["/", "/wire", "/conductor", "/keys"] as const;
+const MOBILE_MORE = ["/ledger", "/systems", "/people", "/reports", "/station"] as const;
 
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
@@ -28,6 +42,11 @@ export function AppShell({ children }: { children: ReactNode }) {
   const stationName = useStation((s) => s.settings.stationName);
   const actor = useStation((s) => s.settings.githubUser);
   const [moreOpen, setMoreOpen] = useState(false);
+  const [introOpen, setIntroOpen] = useState(true);
+
+  useEffect(() => {
+    if (introAlreadyPlayed()) setIntroOpen(false);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -77,9 +96,18 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   const moreActive = MOBILE_MORE.includes(pathname as (typeof MOBILE_MORE)[number]);
 
+  if (pathname === "/conductor") {
+    return (
+      <div className="min-h-dvh overflow-x-hidden bg-cd-bg text-cd-fg">
+        {introOpen ? <Intro onDone={() => setIntroOpen(false)} /> : null}
+        {children}
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-dvh overflow-x-hidden bg-bg text-fg">
-      <FamilySplash />
+      {introOpen ? <Intro onDone={() => setIntroOpen(false)} /> : null}
       <a
         href="#main"
         className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-md focus:bg-accent focus:px-3 focus:py-2 focus:text-accent-fg"
@@ -95,8 +123,11 @@ export function AppShell({ children }: { children: ReactNode }) {
             ))}
           </nav>
           <p className="mt-auto pt-8 font-mono text-2xs leading-relaxed text-subtle">
-            Yours. Arm Honesty to scan for AI systems in the record and follow each one. Not a
-            paywall. Not a kernel.
+            Local {LOCAL_BIND}
+            <br />
+            Desk {DESK_BIND}
+            <br />
+            Yours. Not a paywall. Not a kernel.
           </p>
         </aside>
 
@@ -205,18 +236,23 @@ function Brand({
 }) {
   return (
     <div className="flex items-center gap-3">
-      <span
-        className={cn("block rounded-full", armed ? "pulse-dot" : "size-2 bg-subtle")}
-        aria-hidden="true"
-      />
-      <img
-        src="/family/family.jpg"
-        alt="Honesty above all else. The family."
-        className={cn(
-          "rounded-md border border-border object-cover",
-          compact ? "size-10" : "size-14",
-        )}
-      />
+      <span className="relative shrink-0">
+        <img
+          src="/family/family.jpg"
+          alt="Honesty above all else. The family."
+          className={cn(
+            "rounded-sm object-cover ring-1 ring-accent/40",
+            compact ? "size-10" : "size-12",
+          )}
+        />
+        <span
+          className={cn(
+            "absolute -right-0.5 -bottom-0.5 block rounded-full",
+            armed ? "pulse-dot" : "size-2 bg-subtle",
+          )}
+          aria-hidden="true"
+        />
+      </span>
       <div>
         <p className="font-display text-lg leading-none tracking-tight text-accent">Honesty</p>
         {!compact ? (

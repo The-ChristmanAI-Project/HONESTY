@@ -1,5 +1,10 @@
 #!/usr/bin/env python3
-"""Honesty Local — process list on this computer. Conductor rail included."""
+"""Honesty Local — process list on this computer. Conductor rail included.
+
+DO NOT STUB. This is the real watcher. Bind 127.0.0.1:8787 only.
+The desk is 8788. Conductor hooks live here: /api/conductor, /api/conductor/seat,
+/api/conductor/ingest, conductor-outbox.json. Never replace this file with a placeholder.
+"""
 from __future__ import annotations
 import json, os, platform, re, subprocess, sys, threading, time, urllib.error, urllib.request, webbrowser
 from datetime import datetime, timezone
@@ -272,7 +277,13 @@ def main():
     threading.Thread(target=loop, daemon=True).start()
     httpd = ThreadingHTTPServer((HOST, PORT), Handler)
     url = f"http://{HOST}:{PORT}"
-    sys.stderr.write(f"Honesty Local is on this computer.\n{url}\nConductor rail: {url}/conductor\nYours. No paywall.\n")
+    sys.stderr.write(
+        f"Honesty Local is on this computer.\n"
+        f"Local bind {HOST}:{PORT}\n"
+        f"Desk bind 0.0.0.0:8788\n"
+        f"Conductor rail: {url}/conductor\n"
+        f"Yours. No paywall.\n"
+    )
     try: webbrowser.open(f"{url}/conductor" if "--conductor" in sys.argv else url)
     except Exception: pass
     try: httpd.serve_forever()

@@ -125,6 +125,7 @@ export function deriveAiSystems(
       aliases: [...mergedAliases],
       origin: prior?.origin === "named" || origin === "named" ? "named" : "scan",
       tracking: armed,
+      running: prior?.running ?? false,
       eventCount: (prior?.eventCount ?? 0) + (event ? 1 : 0),
       lastAt,
       lastSummary,

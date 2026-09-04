@@ -1,23 +1,37 @@
 @import "tailwindcss";
 
 @theme {
-  --color-bg: #0e0d0b;
-  --color-surface: #171614;
-  --color-surface-2: #1f1d1a;
-  --color-fg: #efece4;
-  --color-muted: #9a948a;
-  --color-subtle: #6f6a63;
-  --color-border: color-mix(in oklab, #efece4 12%, transparent);
-  --color-border-strong: color-mix(in oklab, #efece4 22%, transparent);
-  --color-accent: #3ad7d0;
-  --color-accent-fg: #0b1212;
-  --color-sage: #3ad7d0;
-  --color-danger: #c45c4a;
-  --color-paper: #efece4;
+  --color-bg: #0b0907;
+  --color-surface: #16120e;
+  --color-surface-2: #1f1913;
+  --color-fg: #f4ead6;
+  --color-muted: #c4b39a;
+  --color-subtle: #8a7a66;
+  --color-border: color-mix(in oklab, #00e5ff 16%, transparent);
+  --color-border-strong: color-mix(in oklab, #00e5ff 32%, transparent);
+  --color-accent: #00e5ff;
+  --color-accent-fg: #041018;
+  --color-sage: #3cf0ff;
+  --color-danger: #e08c82;
+  --color-paper: #f4ead6;
+  --color-lamp: #e8b84a;
+
+  --color-cd-bg: #080a0c;
+  --color-cd-raised: #0d1215;
+  --color-cd-panel: #0e1215;
+  --color-cd-line: color-mix(in oklab, #5fd3e0 18%, transparent);
+  --color-cd-fg: #e4ecef;
+  --color-cd-mute: #8fa3ab;
+  --color-cd-cyan: #5fd3e0;
+  --color-cd-amber: #dcae6a;
+  --color-cd-rose: #e08c82;
+  --color-cd-red: #f0736a;
 
   --font-display: "Fraunces", "Times New Roman", serif;
+  --font-cd: "Newsreader", Georgia, serif;
   --font-sans: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
   --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --font-cd-mono: "JetBrains Mono", ui-monospace, monospace;
 
   --radius-xs: 4px;
   --radius-sm: 8px;
@@ -121,14 +135,14 @@
   width: 8px;
   height: 8px;
   border-radius: 9999px;
-  background: var(--color-sage);
-  box-shadow: 0 0 0 0 color-mix(in oklab, var(--color-sage) 70%, transparent);
+  background: var(--color-accent);
+  box-shadow: 0 0 0 0 color-mix(in oklab, var(--color-accent) 70%, transparent);
   animation: pulse-ring 2.2s var(--ease-out) infinite;
 }
 
 @keyframes pulse-ring {
   0% {
-    box-shadow: 0 0 0 0 color-mix(in oklab, var(--color-sage) 55%, transparent);
+    box-shadow: 0 0 0 0 color-mix(in oklab, var(--color-accent) 55%, transparent);
   }
   70% {
     box-shadow: 0 0 0 8px transparent;

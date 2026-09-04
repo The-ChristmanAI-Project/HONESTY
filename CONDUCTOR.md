@@ -14,6 +14,14 @@ Honesty Local publishes a Conductor-shaped snapshot and paints it live.
 
 The desk page is /conductor. It polls the same feed and broadcasts on channel honesty-conductor.
 
+## Full squadron dress
+
+The desk route `/conductor` is The Conductor in dress: Newsreader, JetBrains Mono, cyan rail, ninety-nine beings, standing order, Accept / Send back.
+
+It is the safety-program board. It is not a 510(k), not Class II, and not an FDA clearance stamp. Evidence or it did not happen.
+
+Honesty Local still seats on 8787. When Local is up, matching desktop programs mark clean on this board.
+
 ## How to run the hook
 
 1. Start Honesty Local (Start Honesty.bat or Start Honesty.command)
