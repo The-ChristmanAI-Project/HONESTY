@@ -9,9 +9,9 @@
   --color-subtle: #6f6a63;
   --color-border: color-mix(in oklab, #efece4 12%, transparent);
   --color-border-strong: color-mix(in oklab, #efece4 22%, transparent);
-  --color-accent: #e6e2d8;
-  --color-accent-fg: #12110f;
-  --color-sage: #8a9188;
+  --color-accent: #3ad7d0;
+  --color-accent-fg: #0b1212;
+  --color-sage: #3ad7d0;
   --color-danger: #c45c4a;
   --color-paper: #efece4;
 
