@@ -1,6 +1,18 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import { Ellipsis, FileText, Home, MessageSquare, Radar, ScrollText, Settings2, Users } from "lucide-react";
+import {
+  Ellipsis,
+  FileText,
+  Home,
+  KeyRound,
+  MessageSquare,
+  Radio,
+  Radar,
+  ScrollText,
+  Settings2,
+  Users,
+} from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
+import { Intro, introAlreadyPlayed } from "@/components/intro";
 import { canPickFolder, hasFolder, scanFolder } from "@/lib/folder-watch";
 import { pullTheRecord, pullTheWire } from "@/lib/pull";
 import { useStation } from "@/lib/store";
@@ -11,13 +23,15 @@ const NAV = [
   { to: "/ledger", label: "Ledger", icon: FileText },
   { to: "/wire", label: "Wire", icon: MessageSquare },
   { to: "/systems", label: "AIs", icon: Radar },
+  { to: "/conductor", label: "Conductor", icon: Radio },
+  { to: "/keys", label: "Keys", icon: KeyRound },
   { to: "/people", label: "People", icon: Users },
   { to: "/reports", label: "Reports", icon: ScrollText },
   { to: "/station", label: "Station", icon: Settings2 },
 ] as const;
 
-const MOBILE_PRIMARY = ["/", "/wire", "/ledger", "/systems"] as const;
-const MOBILE_MORE = ["/people", "/reports", "/station"] as const;
+const MOBILE_PRIMARY = ["/", "/wire", "/conductor", "/keys"] as const;
+const MOBILE_MORE = ["/ledger", "/systems", "/people", "/reports", "/station"] as const;
 
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
@@ -27,6 +41,11 @@ export function AppShell({ children }: { children: ReactNode }) {
   const stationName = useStation((s) => s.settings.stationName);
   const actor = useStation((s) => s.settings.githubUser);
   const [moreOpen, setMoreOpen] = useState(false);
+  const [introOpen, setIntroOpen] = useState(true);
+
+  useEffect(() => {
+    if (introAlreadyPlayed()) setIntroOpen(false);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -78,6 +97,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   return (
     <div className="min-h-dvh overflow-x-hidden bg-bg text-fg">
+      {introOpen ? <Intro onDone={() => setIntroOpen(false)} /> : null}
       <a
         href="#main"
         className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-md focus:bg-accent focus:px-3 focus:py-2 focus:text-accent-fg"
@@ -203,10 +223,23 @@ function Brand({
 }) {
   return (
     <div className="flex items-center gap-3">
-      <span
-        className={cn("block rounded-full", armed ? "pulse-dot" : "size-2 bg-subtle")}
-        aria-hidden="true"
-      />
+      <span className="relative shrink-0">
+        <img
+          src="/family/family.jpg"
+          alt=""
+          className={cn(
+            "rounded-sm object-cover ring-1 ring-accent/40",
+            compact ? "size-10" : "size-12",
+          )}
+        />
+        <span
+          className={cn(
+            "absolute -right-0.5 -bottom-0.5 block rounded-full",
+            armed ? "pulse-dot" : "size-2 bg-subtle",
+          )}
+          aria-hidden="true"
+        />
+      </span>
       <div>
         <p className="font-display text-lg leading-none tracking-tight">Honesty</p>
         {!compact ? (

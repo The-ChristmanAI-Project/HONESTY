@@ -1,19 +1,20 @@
 @import "tailwindcss";
 
 @theme {
-  --color-bg: #0e0d0b;
-  --color-surface: #171614;
-  --color-surface-2: #1f1d1a;
-  --color-fg: #efece4;
-  --color-muted: #9a948a;
-  --color-subtle: #6f6a63;
-  --color-border: color-mix(in oklab, #efece4 12%, transparent);
-  --color-border-strong: color-mix(in oklab, #efece4 22%, transparent);
-  --color-accent: #e6e2d8;
-  --color-accent-fg: #12110f;
-  --color-sage: #8a9188;
-  --color-danger: #c45c4a;
-  --color-paper: #efece4;
+  --color-bg: #0b0907;
+  --color-surface: #16120e;
+  --color-surface-2: #1f1913;
+  --color-fg: #f4ead6;
+  --color-muted: #c4b39a;
+  --color-subtle: #8a7a66;
+  --color-border: color-mix(in oklab, #00e5ff 16%, transparent);
+  --color-border-strong: color-mix(in oklab, #00e5ff 32%, transparent);
+  --color-accent: #00e5ff;
+  --color-accent-fg: #041018;
+  --color-sage: #3cf0ff;
+  --color-danger: #e08c82;
+  --color-paper: #f4ead6;
+  --color-lamp: #e8b84a;
 
   --font-display: "Fraunces", "Times New Roman", serif;
   --font-sans: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
@@ -121,14 +122,14 @@
   width: 8px;
   height: 8px;
   border-radius: 9999px;
-  background: var(--color-sage);
-  box-shadow: 0 0 0 0 color-mix(in oklab, var(--color-sage) 70%, transparent);
+  background: var(--color-accent);
+  box-shadow: 0 0 0 0 color-mix(in oklab, var(--color-accent) 70%, transparent);
   animation: pulse-ring 2.2s var(--ease-out) infinite;
 }
 
 @keyframes pulse-ring {
   0% {
-    box-shadow: 0 0 0 0 color-mix(in oklab, var(--color-sage) 55%, transparent);
+    box-shadow: 0 0 0 0 color-mix(in oklab, var(--color-accent) 55%, transparent);
   }
   70% {
     box-shadow: 0 0 0 8px transparent;

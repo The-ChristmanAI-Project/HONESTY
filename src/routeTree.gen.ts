@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ConductorRouteImport } from './routes/conductor'
+import { Route as KeysRouteImport } from './routes/keys'
 import { Route as LedgerRouteImport } from './routes/ledger'
 import { Route as PeopleRouteImport } from './routes/people'
 import { Route as ReportsRouteImport } from './routes/reports'
@@ -26,6 +27,11 @@ const IndexRoute = IndexRouteImport.update({
 const ConductorRoute = ConductorRouteImport.update({
   id: '/conductor',
   path: '/conductor',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const KeysRoute = KeysRouteImport.update({
+  id: '/keys',
+  path: '/keys',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LedgerRoute = LedgerRouteImport.update({
@@ -62,6 +68,7 @@ const WireRoute = WireRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/conductor': typeof ConductorRoute
+  '/keys': typeof KeysRoute
   '/ledger': typeof LedgerRoute
   '/people': typeof PeopleRoute
   '/reports': typeof ReportsRoute
@@ -72,6 +79,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/conductor': typeof ConductorRoute
+  '/keys': typeof KeysRoute
   '/ledger': typeof LedgerRoute
   '/people': typeof PeopleRoute
   '/reports': typeof ReportsRoute
@@ -83,6 +91,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/conductor': typeof ConductorRoute
+  '/keys': typeof KeysRoute
   '/ledger': typeof LedgerRoute
   '/people': typeof PeopleRoute
   '/reports': typeof ReportsRoute
@@ -95,6 +104,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/conductor'
+    | '/keys'
     | '/ledger'
     | '/people'
     | '/reports'
@@ -105,6 +115,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/conductor'
+    | '/keys'
     | '/ledger'
     | '/people'
     | '/reports'
@@ -115,6 +126,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/conductor'
+    | '/keys'
     | '/ledger'
     | '/people'
     | '/reports'
@@ -126,6 +138,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ConductorRoute: typeof ConductorRoute
+  KeysRoute: typeof KeysRoute
   LedgerRoute: typeof LedgerRoute
   PeopleRoute: typeof PeopleRoute
   ReportsRoute: typeof ReportsRoute
@@ -148,6 +161,13 @@ declare module '@tanstack/react-router' {
       path: '/conductor'
       fullPath: '/conductor'
       preLoaderRoute: typeof ConductorRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/keys': {
+      id: '/keys'
+      path: '/keys'
+      fullPath: '/keys'
+      preLoaderRoute: typeof KeysRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/ledger': {
@@ -198,6 +218,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ConductorRoute: ConductorRoute,
+  KeysRoute: KeysRoute,
   LedgerRoute: LedgerRoute,
   PeopleRoute: PeopleRoute,
   ReportsRoute: ReportsRoute,
