@@ -278,6 +278,10 @@ Yours.
 
 ---
 
-## License posture
+## License
+
+Apache License 2.0. The full text is in `LICENSE`.
+
+Copyright The Christman AI Project.
 
 Use it on the home station you own. Do not point Honesty Local at a machine you do not have the right to watch. The name is the rule: honesty above all else.
