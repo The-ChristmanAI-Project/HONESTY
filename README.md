@@ -28,7 +28,13 @@ When Honesty Local is up, the desk polls `http://127.0.0.1:8787` and shows **Loc
 | Honesty Local | `127.0.0.1:8787` | Loopback only. Process watcher + Conductor hook. |
 | The desk | `0.0.0.0:8788` | The web station. Not 8080. Never 8080. |
 
-`honesty-local/honesty.py` is one Python 3 file, standard library only. As of commit `769aa74` it is **294 lines** (`wc -l honesty-local/honesty.py`). Re-count on clone. Do not leave “about 450” standing.
+`honesty-local/honesty.py` is one Python 3 file, standard library only. Count the commit you mean. Do not swap dates.
+
+| When | Commit | `wc -l honesty-local/honesty.py` |
+|---|---|---|
+| 2026-09-03, as first written | `41d9187` | **456** |
+| 2026-09-04, after compact restore + Conductor rail | `b9648ad` | **284** |
+| Current (binds printed) | `769aa74` | **294** |
 
 ---
 

@@ -1,7 +1,11 @@
-Comment on Docket No. FDA-2026-N-7874 — supplemental correction to comment [PASTE ORIGINAL TRACKING NUMBER].
+Comment on Docket No. FDA-2026-N-7874 — supplemental note to comment [PASTE ORIGINAL TRACKING NUMBER].
 
-Our earlier comment described the local component of HONESTY as "a single Python program of roughly 450 lines." On direct re-reading of the repository at github.com/The-ChristmanAI-Project/HONESTY, the file honesty-local/honesty.py is 294 lines as of commit 769aa74 (`wc -l honesty-local/honesty.py`). The figure was imprecise and we correct it here rather than leave it standing.
+Our earlier comment described the local component of HONESTY as "a single Python program of roughly 450 lines." That figure was the file as it stood when the comment was written.
 
-The substantive characteristics are unchanged and were re-verified against that commit: no dependencies outside the Python standard library; bound to 127.0.0.1:8787 and no other interface; the desk binds 0.0.0.0:8788; append-only ledger with timestamps. README in the same commit states those binds and that line count. Do not round.
+On 2026-09-03, commit 41d9187 added honesty-local/honesty.py at 456 lines (`wc -l`). "Roughly 450" is that snapshot. We are not revising the measurement.
+
+The repository was later edited. On 2026-09-04 the same path was reduced to a placeholder, then restored in compact form with the Conductor rail (commit b9648ad, 284 lines). As of commit 769aa74 the file is 294 lines. That is a later revision of the same program, not a recount of the study file.
+
+The substantive characteristics were re-verified on both snapshots: no dependencies outside the Python standard library; bound to 127.0.0.1 and no other interface; append-only ledger with timestamps.
 
 Submitted by Everett Christman, The Christman AI Project / Luma Cognify AI.
