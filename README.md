@@ -4,7 +4,7 @@ Home-station watch. Yours. No paywall. No account required to run the local half
 
 Honesty is a two-part system that keeps a ledger of what moved on the home station: GitHub activity, seated mail and wire channels, named AI systems, and — when Honesty Local is running on the computer — which AI desktop programs are actually in the process list.
 
-**Repo:** [github.com/EverettNC/HONESTY](https://github.com/EverettNC/HONESTY)
+**Repos (same tree):** [EverettNC/HONESTY](https://github.com/EverettNC/HONESTY) · [The-ChristmanAI-Project/HONESTY](https://github.com/The-ChristmanAI-Project/HONESTY)
 
 This repository is the source. It is not a subscription.
 
@@ -21,6 +21,15 @@ Leave both running. They are one watch, not two products.
 
 When Honesty Local is up, the desk polls `http://127.0.0.1:8787` and shows **Local seated**. Named AIs that appear in the process list are marked **running** from the computer, not from a guess.
 
+**Binds. Count them. Do not round.**
+
+| Half | Bind | What it is |
+|---|---|---|
+| Honesty Local | `127.0.0.1:8787` | Loopback only. Process watcher + Conductor hook. |
+| The desk | `0.0.0.0:8788` | The web station. Not 8080. Never 8080. |
+
+`honesty-local/honesty.py` is one Python 3 file, standard library only. As of commit `769aa74` it is **294 lines** (`wc -l honesty-local/honesty.py`). Re-count on clone. Do not leave “about 450” standing.
+
 ---
 
 ## What Honesty is
@@ -36,7 +45,7 @@ When Honesty Local is up, the desk polls `http://127.0.0.1:8787` and shows **Loc
 - Not a phone tap. It does not silently read SMS, cellular calls, or other people’s devices.
 - Not a browser-tab inspector. Web sessions in Chrome / Safari / Edge do not show as separate programs.
 - Not a paywalled service. There is no lock, no seat license, no “pro tier” inside this repo.
-- Not an org-owned product. Source lives under **EverettNC**. The Christman AI Project org needs admin if you want a copy there too.
+- Source is on **both** GitHub homes: EverettNC and The-ChristmanAI-Project. Push both.
 
 ---
 
@@ -91,9 +100,13 @@ The program binds **only** to `127.0.0.1:8787` and opens that address in your br
 | Method | Path | Purpose |
 |---|---|---|
 | `GET` | `/` | Local desk HTML |
+| `GET` | `/conductor` | Conductor rail HTML |
 | `GET` | `/api/status` | Current snapshot (JSON) |
+| `GET` | `/api/conductor` | Conductor-shaped snapshot (JSON) |
 | `POST` | `/api/scan` | Scan now |
 | `POST` | `/api/arm` | Body `{ "armed": true \| false }` |
+| `POST` | `/api/conductor/seat` | Body `{ "url": "https://…/ingest" }` |
+| `POST` | `/api/conductor/ingest` | Conductor ruling into the Local ledger |
 | `GET` | `/api/report.txt` | Plain-text report |
 | `OPTIONS` | any of the above | CORS preflight so the web desk can read Local |
 
@@ -136,7 +149,7 @@ npm install
 npm run dev
 ```
 
-Dev server: `http://0.0.0.0:8080`
+Dev server: `http://0.0.0.0:8788` — loopback bind of the desk. Not 8080. Never 8080. Honesty Local stays on `127.0.0.1:8787`.
 
 Other scripts:
 
@@ -152,6 +165,8 @@ npm run test
 | Path | Page | Job |
 |---|---|---|
 | `/` | Desk | Home of the watch. Arm it. See whether Local is seated. |
+| `/conductor` | Conductor | Full squadron dress. Ninety-nine beings. Accept / Send back. |
+| `/keys` | Keys | NVIDIA, Ollama, AWS, OpenAI, Anthropic. This browser only. |
 | `/station` | Station | Home-station settings, Honesty Local download / seat, poll interval, GitHub user and org. |
 | `/systems` | AIs | Named AI systems. Scan, follow, mark running. Shows Local process hits when seated. |
 | `/ledger` | Ledger | Every recorded movement. |
@@ -201,8 +216,8 @@ Grant **EverettNC**. Org access needs org admin.
 
 1. Start Honesty Local on the home station (`Start Honesty.bat` / `.command`).
 2. Leave the Local window running. Confirm [http://127.0.0.1:8787](http://127.0.0.1:8787) says **ARMED**.
-3. Open the desk.
-4. Station should read **Local seated**.
+3. Open the desk at [http://127.0.0.1:8788](http://127.0.0.1:8788).
+4. Station should read **Local seated**. Conductor is `/conductor`.
 5. AIs that are desktop programs show **running** with process counts and PIDs from Local.
 6. Keep a report from either half when you want a snapshot on paper.
 
@@ -245,7 +260,7 @@ Runtime files that should stay off git:
 
 1. **A browser cannot list processes.** That is why Honesty Local exists. If someone tells you the website alone can see Claude running on the PC, that is a lie.
 2. **A browser tab is not a process named Claude.** Claude in a tab is Chrome / Edge / Safari. Local will not label it Claude.
-3. **Local only sees this computer.** It binds to localhost. It does not scan the office, the phone, or someone else’s laptop.
+3. **Local only sees this computer.** It binds to `127.0.0.1:8787` and no other interface. It does not scan the office, the phone, or someone else’s laptop. The desk is `0.0.0.0:8788`.
 4. **The ledger is a record you keep, not a warrant.** Start/stop rows mean “appeared in / left the process list,” not intent.
 5. **Folder pick is consent.** No silent whole-disk crawl from the desk.
 6. **GitHub rate limits and org policy apply.** Personal repo pushes land on EverettNC. Org repos need org admin.
@@ -255,7 +270,7 @@ Runtime files that should stay off git:
 ## Ownership
 
 - Owner: Everett / The Christman AI Project
-- Source: `EverettNC/HONESTY`
+- Source: `EverettNC/HONESTY` and `The-ChristmanAI-Project/HONESTY`
 - Honesty Local: no account, no telemetry, no paywall
 - The desk source is in this repo. Run it yourself.
 

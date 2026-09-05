@@ -11,6 +11,8 @@ Windows: double-click "Start Honesty.bat"
 Python 3 must be installed. No account. No paywall. The ledger
 is written next to this file as honesty-ledger.json.
 
+Binds 127.0.0.1:8787 only. The desk is 0.0.0.0:8788. Not 8080.
+
 It can see desktop Claude, Cursor, Copilot, ChatGPT app, Ollama,
 LM Studio, Grok if they are programs. A tab in Chrome is not a
 separate program. That is the operating system, not a lock.
