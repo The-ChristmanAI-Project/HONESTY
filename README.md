@@ -4,9 +4,9 @@ Home-station watch. Yours. No paywall. No account required to run the local half
 
 Honesty is a two-part system that keeps a ledger of what moved on the home station: GitHub activity, seated mail and wire channels, named AI systems, and — when Honesty Local is running on the computer — which AI desktop programs are actually in the process list.
 
-**Repos (same tree):** [EverettNC/HONESTY](https://github.com/EverettNC/HONESTY) · [The-ChristmanAI-Project/HONESTY](https://github.com/The-ChristmanAI-Project/HONESTY)
+**Public source:** [The-ChristmanAI-Project/HONESTY](https://github.com/The-ChristmanAI-Project/HONESTY)
 
-This repository is the source. It is not a subscription.
+This repository is the source people clone. It is not a subscription. Everett’s private station copy is not this download.
 
 ---
 
@@ -51,7 +51,7 @@ When Honesty Local is up, the desk polls `http://127.0.0.1:8787` and shows **Loc
 - Not a phone tap. It does not silently read SMS, cellular calls, or other people’s devices.
 - Not a browser-tab inspector. Web sessions in Chrome / Safari / Edge do not show as separate programs.
 - Not a paywalled service. There is no lock, no seat license, no “pro tier” inside this repo.
-- Source is on **both** GitHub homes: EverettNC and The-ChristmanAI-Project. Push both.
+- Public source is The-ChristmanAI-Project/HONESTY. Only Everett can push `main`.
 
 ---
 
@@ -280,14 +280,14 @@ Runtime files that should stay off git:
 3. **Local only sees this computer.** It binds to `127.0.0.1:8787` and no other interface. It does not scan the office, the phone, or someone else’s laptop. The desk is `0.0.0.0:8788`.
 4. **The ledger is a record you keep, not a warrant.** Start/stop rows mean “appeared in / left the process list,” not intent.
 5. **Folder pick is consent.** No silent whole-disk crawl from the desk.
-6. **GitHub rate limits and org policy apply.** Personal repo pushes land on EverettNC. Org repos need org admin.
+6. **GitHub rate limits and org policy apply.** Public clones use the org repo.
 
 ---
 
 ## Ownership
 
 - Owner: Everett / The Christman AI Project
-- Source: `EverettNC/HONESTY` and `The-ChristmanAI-Project/HONESTY`
+- Public source: `The-ChristmanAI-Project/HONESTY`
 - Honesty Local: no account, no telemetry, no paywall
 - The desk source is in this repo. Run it yourself.
 
