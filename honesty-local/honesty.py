@@ -132,7 +132,53 @@ def scan_once():
                 "last_scan": state["last_scan"], "note": state["note"], "process_count": len(procs)}
     save_ledger(); write_outbox(); push_to_conductor(); return snap
 
-def conductor_snapshot():
+def private_roster(skip):
+    path = HERE / "squadron.local.json"
+    if not path.exists():
+        return []
+    try:
+        rows = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return []
+    if not isinstance(rows, list):
+        return []
+    out = []
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        name = str(row.get("name") or "").strip()
+        if not name or name.lower() in skip:
+            continue
+        status = str(row.get("status") or "empty")
+        if status not in ("clean", "review", "blocked", "empty", "dark"):
+            status = "empty"
+        out.append({
+            "id": str(row.get("id") or name.lower().replace(" ", "-")),
+            "name": name,
+            "title": str(row.get("title") or "Private roster"),
+            "division": str(row.get("division") or "Private"),
+            "wing": str(row.get("wing") or "Private"),
+            "focus": str(row.get("focus") or ""),
+            "mandate": str(row.get("mandate") or ""),
+            "domain": str(row.get("domain") or "Private"),
+            "shipped": row.get("shipped") or 0,
+            "emptyStreak": row.get("emptyStreak") or 0,
+            "status": status,
+            "queued": row.get("queued") or 0,
+            "artifacts": row.get("artifacts") or 0,
+            "confidence": row.get("confidence") or 0,
+            "verified": False,
+            "hoursAgo": row.get("hoursAgo") or 0,
+            "minutes": 0,
+            "tokens": 0,
+            "nextIn": 0,
+            "pids": [],
+            "lastAt": None,
+            "private": True,
+        })
+    return out
+
+def conductor_snapshot(include_private=True):
     with lock:
         running = {item["name"]: item for item in state["running"]}
         seen_map = {item["name"]: item for item in state["seen"]}
@@ -158,7 +204,10 @@ def conductor_snapshot():
                            "status": status, "queued": 0, "artifacts": artifacts,
                            "confidence": 1.0 if live else (0.6 if seen else 0.0), "verified": verified,
                            "hoursAgo": round(hours, 2), "minutes": 0, "tokens": 0, "nextIn": 0,
-                           "pids": (live or seen or {}).get("pids", []), "lastAt": last_at})
+                           "pids": (live or seen or {}).get("pids", []), "lastAt": last_at, "private": False})
+        if include_private:
+            skip = {name.lower() for name, _ in CATALOG}
+            beings.extend(private_roster(skip))
         return {"source": "honesty-local", "version": 1, "seated": True, "wing": "Honesty",
                 "hook": state["conductor_url"], "armed": state["armed"], "platform": state["platform"],
                 "machine": state["machine"], "last_scan": state["last_scan"],
@@ -174,7 +223,7 @@ def write_outbox():
 def push_to_conductor():
     with lock: url = state["conductor_url"]
     if not url: return
-    req = urllib.request.Request(url, data=json.dumps(conductor_snapshot()).encode("utf-8"), method="POST",
+    req = urllib.request.Request(url, data=json.dumps(conductor_snapshot(include_private=False)).encode("utf-8"), method="POST",
                                  headers={"Content-Type": "application/json", "User-Agent": "Honesty-Local"})
     try:
         with urllib.request.urlopen(req, timeout=4) as res: res.read(256)

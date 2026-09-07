@@ -182,7 +182,7 @@ npm run test
 | Path | Page | Job |
 |---|---|---|
 | `/` | Desk | Home of the watch. Arm it. See whether Local is seated. |
-| `/conductor` | Conductor | Full squadron dress. Ninety-nine beings. Accept / Send back. |
+| `/conductor` | Conductor | Honesty reports here. Named programs on this computer. |
 | `/keys` | Keys | NVIDIA, Ollama, AWS, OpenAI, Anthropic. This browser only. |
 | `/station` | Station | Home-station settings, Honesty Local download / seat, poll interval, GitHub user and org. |
 | `/systems` | AIs | Named AI systems. Scan, follow, mark running. Shows Local process hits when seated. |
