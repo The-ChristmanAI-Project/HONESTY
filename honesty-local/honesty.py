@@ -12,9 +12,16 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import urlparse
 
-HOST, PORT = "127.0.0.1", 8787
+# Loopback only. That default does not change and no run inherits anything
+# else unless it is asked for by name. A container has no loopback the home
+# station's browser can reach, so the image — and only the image — sets
+# HONESTY_LOCAL_HOST=0.0.0.0 to publish 8787 outward.
+HOST = os.environ.get("HONESTY_LOCAL_HOST", "127.0.0.1")
+PORT = int(os.environ.get("HONESTY_LOCAL_PORT", "8787"))
 HERE = Path(__file__).resolve().parent
-LEDGER, HOOK, OUTBOX = HERE / "honesty-ledger.json", HERE / "conductor-hook.json", HERE / "conductor-outbox.json"
+DATA = Path(os.environ.get("HONESTY_DATA_DIR", str(HERE))).resolve()
+DATA.mkdir(parents=True, exist_ok=True)
+LEDGER, HOOK, OUTBOX = DATA / "honesty-ledger.json", DATA / "conductor-hook.json", DATA / "conductor-outbox.json"
 CATALOG = [
     ("Claude", ["claude", "anthropic"]), ("Copilot", ["copilot", "githubcopilot", "github copilot"]),
     ("Cursor", ["cursor"]), ("ChatGPT", ["chatgpt"]), ("Grok", ["grok"]), ("Ollama", ["ollama"]),

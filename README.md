@@ -92,7 +92,18 @@ One-shot report, no server:
 python3 honesty.py --once
 ```
 
-The program binds **only** to `127.0.0.1:8787` and opens that address in your browser. It is not published to the network.
+On the home station the program binds **only** to `127.0.0.1:8787` and opens that address in your browser. It is not published to the network. A container is the one exception: it sets `HONESTY_LOCAL_HOST=0.0.0.0` so the desk on 8788 can reach it.
+
+### Container
+
+One image. Both binds. Honesty Local inside the container reads the **container's** process list, not the Mac's. That is a namespace, not a defect. Run `honesty.py` on the home station when you want the home station's answer.
+
+```bash
+docker build -t honesty .
+docker run --rm -p 8788:8788 -p 8787:8787 -v honesty-data:/data honesty
+```
+
+Desk: `http://127.0.0.1:8788` · Local: `http://127.0.0.1:8787` · ledger in the `honesty-data` volume.
 
 ### What you get
 
