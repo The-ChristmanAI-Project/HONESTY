@@ -1,5 +1,5 @@
 import { format } from "date-fns";
-import { deriveAiSystems } from "./ai-scan";
+import { deriveAiSystems, isAiLogin, isOutsideEvent, isOutsidePerson } from "./ai-scan";
 import { deriveChannels, counterpartOf } from "./comms";
 import { deriveActors, deriveFiles, isComms, isTrustedActor, KIND_LABEL, SOURCE_LABEL } from "./github";
 import type { AccessEvent, HonestyReport, NamedAi, StationSettings } from "./types";
@@ -25,7 +25,9 @@ export function buildReport(
   const owner = settings.githubUser;
   const comms = events.filter(isComms);
   const channels = deriveChannels(events);
-  const outside = actors.filter((actor) => !isTrustedActor(actor.login, owner, knownActors));
+  const outside = actors.filter((actor) =>
+    isOutsidePerson(actor.login, owner, knownActors, namedAis),
+  );
   const systems = deriveAiSystems(events, namedAis, armed);
   const window =
     events.length === 0
@@ -56,11 +58,16 @@ export function buildReport(
 
   lines.push("", "AI SYSTEMS");
   if (systems.length === 0) {
-    lines.push("  None named or found. This desk cannot see other programs on the computer.");
+    lines.push("  None named or found.");
   } else {
     for (const system of systems) {
+      const seat = system.running
+        ? ", on this computer"
+        : system.tracking
+          ? ", tracking"
+          : ", at rest";
       lines.push(
-        `  ${system.name} (${system.origin}${system.tracking ? ", tracking" : ", at rest"}) — ${system.eventCount} hits${
+        `  ${system.name} (${system.origin}${seat}) — ${system.eventCount} hits${
           system.lastAt ? ` · last ${stamp(system.lastAt)}` : ""
         }`,
       );
@@ -82,7 +89,11 @@ export function buildReport(
 
   lines.push("", "ACTORS");
   for (const actor of actors) {
-    const tag = isTrustedActor(actor.login, owner, knownActors) ? "known" : "outside";
+    const tag = isAiLogin(actor.login, namedAis)
+      ? "ai"
+      : isTrustedActor(actor.login, owner, knownActors)
+        ? "known"
+        : "outside";
     lines.push(`  ${actor.login} (${tag}) — ${actor.eventCount}`);
   }
 
@@ -95,9 +106,9 @@ export function buildReport(
   } else {
     for (const event of comms.slice(0, 120)) {
       const who = counterpartOf(event);
-      const tagged = isTrustedActor(event.actorLogin, owner, knownActors)
-        ? who
-        : `${who} [outside]`;
+      const tagged = isOutsideEvent(event, owner, knownActors, namedAis)
+        ? `${who} [outside]`
+        : who;
       const dir = event.direction ? ` ${event.direction}` : "";
       lines.push(
         `  ${stamp(event.at)}  ${tagged}  ${KIND_LABEL[event.kind]}${dir}  ${SOURCE_LABEL[event.source]}  ${event.summary}`,
@@ -119,9 +130,9 @@ export function buildReport(
 
   lines.push("", "LEDGER");
   for (const event of events.slice(0, 120)) {
-    const who = isTrustedActor(event.actorLogin, owner, knownActors)
-      ? event.actorLogin
-      : `${event.actorLogin} [outside]`;
+    const who = isOutsideEvent(event, owner, knownActors, namedAis)
+      ? `${event.actorLogin} [outside]`
+      : event.actorLogin;
     const extra = event.files.length ? ` · ${event.files.slice(0, 3).join(", ")}` : "";
     lines.push(
       `  ${stamp(event.at)}  ${who}  ${KIND_LABEL[event.kind]}  ${event.summary}${extra}`,
@@ -133,8 +144,8 @@ export function buildReport(
   lines.push("  Gmail, Calendar, Outlook, and Teams load only when seated through Grok.");
   lines.push("  Phone calls, SMS, iMessage, Signal, WhatsApp, and other apps are on the record only if you write them here.");
   lines.push("  GitHub is the public record this desk can see from a browser. Private GitHub needs a token kept in this browser.");
-  lines.push("  Honesty follows AI systems that appear on GitHub, mail, the wire, and names you give it.");
-  lines.push("  It cannot scan other programs on the computer, attach to a process, or follow a phone.");
+  lines.push("  Honesty Local reads named AI desktop programs from this computer's process list.");
+  lines.push("  Browser tabs are not programs. Kernel hooks and phone taps are not claimed.");
   lines.push("");
 
   return {

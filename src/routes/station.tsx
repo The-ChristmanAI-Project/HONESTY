@@ -96,8 +96,8 @@ function StationPage() {
           Optional GitHub token stays in this browser. Mail, calendar, Outlook, and Teams load
           only if already seated in Grok — optional, never required. Calls, SMS, iMessage,
           Signal, and WhatsApp are recorded by hand. Arm Honesty to scan GitHub, mail, the wire,
-          and named AIs — then follow each in the record. It cannot see other programs on the
-          computer. Kernel file-opens and phone taps are not claimed.
+          and named AIs — then follow each in the record. Honesty Local reads the process list
+          for named AI desktop programs. Kernel file-opens and phone taps are not claimed.
         </p>
       </Panel>
 

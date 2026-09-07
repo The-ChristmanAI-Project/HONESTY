@@ -8,9 +8,9 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Chip } from "@/components/ui/chip";
 import { Panel } from "@/components/ui/panel";
-import { deriveAiSystems, eventTouchesAnyAi } from "@/lib/ai-scan";
+import { deriveAiSystems, eventTouchesAnyAi, isOutsideEvent, isOutsidePerson } from "@/lib/ai-scan";
 import { deriveChannels, deriveThreads } from "@/lib/comms";
-import { deriveActors, deriveFiles, isComms, isTrustedActor } from "@/lib/github";
+import { deriveActors, deriveFiles, isComms } from "@/lib/github";
 import { pullTheRecord, pullTheWire } from "@/lib/pull";
 import { useStation } from "@/lib/store";
 import { relTime } from "@/lib/time";
@@ -28,6 +28,9 @@ function Desk() {
   const warnings = useStation((s) => s.warnings);
   const mailWarning = useStation((s) => s.mailWarning);
   const namedAis = useStation((s) => s.namedAis);
+  const localSeated = useStation((s) => s.localSeated);
+  const localMachine = useStation((s) => s.localMachine);
+  const liveLocal = namedAis.filter((ai) => ai.running && ai.runningFrom === "local");
   const files = useMemo(() => deriveFiles(events), [events]);
   const actors = useMemo(() => deriveActors(events), [events]);
   const comms = useMemo(() => events.filter(isComms), [events]);
@@ -43,8 +46,8 @@ function Desk() {
     (channels.find((c) => c.key === "call")?.count ?? 0) +
     (channels.find((c) => c.key === "meeting")?.count ?? 0);
 
-  const outside = actors.filter(
-    (actor) => !isTrustedActor(actor.login, settings.githubUser, known),
+  const outside = actors.filter((actor) =>
+    isOutsidePerson(actor.login, settings.githubUser, known, namedAis),
   );
 
   const shown = useMemo(() => {
@@ -53,11 +56,11 @@ function Desk() {
       if (filter === "wire") return isComms(event);
       if (filter === "ai") return eventTouchesAnyAi(event, systems);
       if (filter === "outside") {
-        return !isTrustedActor(event.actorLogin, settings.githubUser, known);
+        return isOutsideEvent(event, settings.githubUser, known, namedAis);
       }
       return true;
     });
-  }, [events, filter, settings.githubUser, known, systems]);
+  }, [events, filter, settings.githubUser, known, namedAis, systems]);
 
   async function onArm() {
     const next = !armed;
@@ -106,10 +109,8 @@ function Desk() {
           </>
         }
       >
-        Yours. Arm Honesty and it scans GitHub, mail, the wire, and every AI you name — then
-        starts a tracker on each one, and follows that name wherever it appears. This desk
-        cannot see other programs on the computer. It is not a kernel hook, and it is not a
-        paywall.
+        Honesty Local reads named AI programs on this computer. Arm the watch for GitHub, mail,
+        and the wire. Not a kernel hook. Not a paywall.
       </PageHeader>
 
       <dl className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -125,6 +126,13 @@ function Desk() {
           Last pull {lastFetchedAt ? relTime(lastFetchedAt) : "not yet"}
         </span>
         <span className="font-mono">@{settings.githubUser}</span>
+        <span className="font-mono">
+          {localSeated
+            ? `${localMachine ?? "Local"}: ${
+                liveLocal.length ? liveLocal.map((ai) => ai.name).join(" · ") : "no named AI running"
+              }`
+            : "Honesty Local quiet"}
+        </span>
       </div>
       {warnings[0] ? <p className="mt-3 text-sm text-danger">{warnings[0]}</p> : null}
       {mailWarning ? (
@@ -160,8 +168,12 @@ function Desk() {
                 <li key={system.id} className="min-w-0">
                   <div className="flex items-center justify-between gap-2">
                     <p className="truncate text-sm font-medium">{system.name}</p>
-                    <Badge tone={system.tracking ? "sage" : "muted"}>
-                      {system.tracking ? "following" : "at rest"}
+                    <Badge tone={system.running || system.tracking ? "sage" : "muted"}>
+                      {system.running
+                        ? "on this computer"
+                        : system.tracking
+                          ? "following"
+                          : "at rest"}
                     </Badge>
                   </div>
                   <p className="truncate text-xs text-subtle">

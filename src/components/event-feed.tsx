@@ -25,7 +25,10 @@ export function EventFeed({
   return (
     <ol className="divide-y divide-border">
       {events.map((event) => {
-        const trusted = isTrustedActor(event.actorLogin, owner, known);
+        const trusted =
+          event.source === "local" ||
+          event.source === "home" ||
+          isTrustedActor(event.actorLogin, owner, known);
         const ai = isAi?.(event);
         return (
           <li key={event.id} className="py-4">

@@ -1,40 +1,16 @@
 import { toast } from "sonner";
+import { eventsFromLocal, type LocalSnapshot } from "./local-events";
 import { useStation } from "./store";
-import type { AccessEvent } from "./types";
+
+export type {
+  LocalLedgerItem,
+  LocalProcess,
+  LocalSeen,
+  LocalSnapshot,
+} from "./local-events";
+export { eventsFromLocal, pruneStaleLive } from "./local-events";
 
 const LOCAL_URL = "http://127.0.0.1:8787";
-
-export type LocalProcess = {
-  name: string;
-  count: number;
-  pids: string[];
-};
-
-export type LocalSeen = {
-  name: string;
-  firstAt?: string;
-  lastAt: string;
-  count?: number;
-  pids?: string[];
-};
-
-export type LocalLedgerItem = {
-  at: string;
-  kind: string;
-  name: string;
-  summary: string;
-};
-
-export type LocalSnapshot = {
-  armed: boolean;
-  platform: string;
-  machine: string;
-  running: LocalProcess[];
-  seen?: LocalSeen[];
-  ledger: LocalLedgerItem[];
-  last_scan: string | null;
-  note?: string;
-};
 
 export async function probeLocal(): Promise<LocalSnapshot | null> {
   try {
@@ -47,18 +23,6 @@ export async function probeLocal(): Promise<LocalSnapshot | null> {
   } catch {
     return null;
   }
-}
-
-function eventsFromLocal(snap: LocalSnapshot): AccessEvent[] {
-  return (snap.ledger ?? []).map((item) => ({
-    id: `local-${item.kind}-${item.name}-${item.at}`,
-    at: item.at,
-    kind: item.kind === "stop" ? "other" : "open",
-    source: "local",
-    actorLogin: item.name,
-    files: [],
-    summary: item.summary,
-  }));
 }
 
 export async function pullLocal(): Promise<boolean> {

@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { belongsToStation, mergeEvents } from "./github";
+import { pruneStaleLive } from "./local-events";
 import { SEED_EVENTS } from "./seed";
 import type {
   AccessEvent,
@@ -162,8 +163,10 @@ export const useStation = create<StationState>()(
           const scoped = events.filter((event) =>
             belongsToStation(event, state.settings.githubUser, state.settings.githubOrg),
           );
-          const merged = mergeEvents(state.events, scoped).filter((event) =>
-            belongsToStation(event, state.settings.githubUser, state.settings.githubOrg),
+          const merged = mergeEvents(state.events, scoped).filter(
+            (event) =>
+              event.source !== "github" ||
+              belongsToStation(event, state.settings.githubUser, state.settings.githubOrg),
           );
           return {
             events: merged,
@@ -250,7 +253,7 @@ export const useStation = create<StationState>()(
             localMachine: machine,
             localPlatform: platform,
             namedAis,
-            events: mergeEvents(state.events, events),
+            events: mergeEvents(pruneStaleLive(state.events, names), events),
           };
         }),
       applyConductor: (feed) =>
@@ -289,6 +292,7 @@ export const useStation = create<StationState>()(
           namedAis: state.namedAis.map((ai) =>
             ai.runningFrom === "local" ? { ...ai, running: false, runningFrom: undefined } : ai,
           ),
+          events: state.events.filter((event) => !event.id.startsWith("local-live-")),
         })),
       addKnown: (login) =>
         set((state) => {

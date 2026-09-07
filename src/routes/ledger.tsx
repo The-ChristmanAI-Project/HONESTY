@@ -72,8 +72,9 @@ function LedgerPage() {
   return (
     <div className="mx-auto max-w-5xl">
       <PageHeader kicker="File ledger" title="What was opened, and by whom.">
-        GitHub pushes list files when GitHub sends them. Home openings you record here, or that
-        the attached folder notices, sit in the same book.
+        GitHub pushes list files when GitHub sends them. Named AI programs on this computer sit
+        in the events tab. Home openings you record here, or that the attached folder notices,
+        sit in the same book.
       </PageHeader>
 
       <Panel className="mt-6">

@@ -292,6 +292,7 @@ export function belongsToStation(
 ): boolean {
   if (
     event.source === "home" ||
+    event.source === "local" ||
     event.source === "mail" ||
     event.source === "wire" ||
     event.source === "calendar" ||
