@@ -15,6 +15,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { Intro, introAlreadyPlayed } from "@/components/intro";
 import { DESK_BIND, LOCAL_BIND } from "@/lib/conductor";
 import { canPickFolder, hasFolder, scanFolder } from "@/lib/folder-watch";
+import { pullLocal } from "@/lib/local-agent";
 import { pullTheRecord, pullTheWire } from "@/lib/pull";
 import { useStation } from "@/lib/store";
 import { cn } from "@/lib/utils";
@@ -65,6 +66,15 @@ export function AppShell({ children }: { children: ReactNode }) {
     if (!hydrated) return;
     void pullTheRecord();
     if (useStation.getState().armed) void pullTheWire(false);
+  }, [hydrated]);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    void pullLocal();
+    const id = window.setInterval(() => {
+      void pullLocal();
+    }, 8000);
+    return () => window.clearInterval(id);
   }, [hydrated]);
 
   useEffect(() => {

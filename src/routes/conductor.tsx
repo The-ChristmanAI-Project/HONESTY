@@ -166,7 +166,13 @@ function ConductorPage() {
             <span className="text-cd-mute/50">Local</span>
             <span className="text-cd-cyan">{DESK_BIND}</span>
             <span className="text-cd-mute/50">Desk</span>
-            <span className="text-cd-mute">{localSeated ? "seated" : "quiet"}</span>
+            <span className="text-cd-mute">
+              {localSeated
+                ? running.length
+                  ? running.map((row) => row.name).join(" · ")
+                  : "seated"
+                : "quiet"}
+            </span>
           </p>
         </div>
         <nav className="flex flex-wrap items-center gap-2 py-2" aria-label="Conductor">

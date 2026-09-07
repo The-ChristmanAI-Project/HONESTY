@@ -1,3 +1,4 @@
+import { isTrustedActor } from "./github";
 import type { AccessEvent, AiSystem, EventSource, NamedAi } from "./types";
 
 export const AI_CATALOG: { name: string; aliases: string[] }[] = [
@@ -137,6 +138,11 @@ export function deriveAiSystems(
 
   for (const namedAi of named) {
     upsert(namedAi.id, namedAi.name, namedAi.aliases, "named");
+    const key = norm(namedAi.name) || namedAi.id;
+    const prior = map.get(key);
+    if (prior && namedAi.running) {
+      map.set(key, { ...prior, running: true });
+    }
   }
 
   const chronological = [...events].sort((a, b) => (a.at < b.at ? -1 : 1));
@@ -158,10 +164,32 @@ export function deriveAiSystems(
   }
 
   return [...map.values()].sort((a, b) => {
+    if (a.running !== b.running) return a.running ? -1 : 1;
     if (a.tracking !== b.tracking) return a.tracking ? -1 : 1;
     if ((a.lastAt ?? "") !== (b.lastAt ?? "")) return (a.lastAt ?? "") < (b.lastAt ?? "") ? 1 : -1;
     return b.eventCount - a.eventCount;
   });
+}
+
+export function isOutsidePerson(
+  login: string,
+  owner: string,
+  known: string[],
+  named: NamedAi[],
+): boolean {
+  if (isTrustedActor(login, owner, known)) return false;
+  if (isAiLogin(login, named)) return false;
+  return true;
+}
+
+export function isOutsideEvent(
+  event: AccessEvent,
+  owner: string,
+  known: string[],
+  named: NamedAi[],
+): boolean {
+  if (event.source === "local" || event.source === "home") return false;
+  return isOutsidePerson(event.actorLogin, owner, known, named);
 }
 
 export function eventTouchesAnyAi(event: AccessEvent, systems: AiSystem[]): boolean {

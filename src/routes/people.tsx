@@ -23,11 +23,13 @@ function PeoplePage() {
   const owner = useStation((s) => s.settings.githubUser);
   const [name, setName] = useState("");
 
-  const ranked = [...actors].sort((a, b) => {
-    const at = isTrustedActor(a.login, owner, known) ? 1 : 0;
-    const bt = isTrustedActor(b.login, owner, known) ? 1 : 0;
-    return at - bt || b.eventCount - a.eventCount;
-  });
+  const ranked = actors
+    .filter((actor) => !isAiLogin(actor.login, namedAis))
+    .sort((a, b) => {
+      const at = isTrustedActor(a.login, owner, known) ? 1 : 0;
+      const bt = isTrustedActor(b.login, owner, known) ? 1 : 0;
+      return at - bt || b.eventCount - a.eventCount;
+    });
 
   function addKnown(e: FormEvent) {
     e.preventDefault();
@@ -41,8 +43,8 @@ function PeoplePage() {
   return (
     <div className="mx-auto max-w-5xl">
       <PageHeader kicker="People" title="Who you spoke with.">
-        Mail, calls, texts, meetings, GitHub. The owner is known. Anyone else is outside until
-        you name them. Outside means unnamed, not hostile. This list is yours.
+        Mail, calls, texts, meetings, GitHub. Named AI programs sit on AIs, not here. The owner
+        is known. Anyone else is outside until you name them.
       </PageHeader>
 
       <form

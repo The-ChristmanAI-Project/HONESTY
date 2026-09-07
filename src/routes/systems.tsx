@@ -76,9 +76,8 @@ function SystemsPage() {
           </>
         }
       >
-        This desk cannot see other programs on the computer. Arm Honesty and it scans GitHub, mail,
-        the wire, and every AI you name. A tracker opens on each one, and follows that name
-        wherever it appears in the record.
+        Honesty Local reads named AI programs on this computer. Arm the watch to follow each
+        name through GitHub, mail, and the wire.
       </PageHeader>
 
       <Panel className="mt-6">
@@ -121,8 +120,12 @@ function SystemsPage() {
                 >
                   <div className="flex items-center justify-between gap-2">
                     <p className="truncate font-medium">{system.name}</p>
-                    <Badge tone={system.tracking ? "sage" : "muted"}>
-                      {system.tracking ? "following" : "at rest"}
+                    <Badge tone={system.running || system.tracking ? "sage" : "muted"}>
+                      {system.running
+                        ? "on this computer"
+                        : system.tracking
+                          ? "following"
+                          : "at rest"}
                     </Badge>
                   </div>
                   <p className="mt-1 font-mono text-xs text-subtle">
@@ -145,9 +148,11 @@ function SystemsPage() {
                 <div>
                   <h2 className="text-xl">{current.name}</h2>
                   <p className="mt-1 text-sm text-muted">
-                    {current.tracking
-                      ? "Tracker live. New GitHub, mail, and wire hits attach here."
-                      : "Named. Arm the watch to follow it through the record."}
+                    {current.running
+                      ? "On this computer now. Honesty Local has it in the process list."
+                      : current.tracking
+                        ? "Tracker live. Process list, GitHub, mail, and wire hits attach here."
+                        : "Named. Arm the watch to follow it through the record."}
                   </p>
                 </div>
                 {namedAis.some((ai) => ai.id === current.id) ? (
@@ -180,9 +185,11 @@ function SystemsPage() {
                 owner={settings.githubUser}
                 known={known}
                 empty={
-                  current.tracking
-                    ? "No movement yet. Following. When this AI appears on GitHub, mail, or the wire, the trail fills."
-                    : "No movement in the record. Arm the watch to follow."
+                  current.running
+                    ? "On this computer. Pull the desk if the live line is missing."
+                    : current.tracking
+                      ? "No movement yet. Following the process list, GitHub, mail, and the wire."
+                      : "No movement in the record. Arm the watch to follow."
                 }
               />
             </>
