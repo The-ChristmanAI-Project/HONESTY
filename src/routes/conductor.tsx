@@ -4,20 +4,15 @@ import { toast } from "sonner";
 import {
   DESK_BIND,
   LOCAL_BIND,
+  RISK,
+  dressStatus,
   pullConductorFeed,
   publishConductor,
+  type ConductorBeing,
+  type ConductorFeed,
   type ConductorStatus,
 } from "@/lib/conductor";
 import { pullLocal } from "@/lib/local-agent";
-import {
-  RISK,
-  SQUADRON,
-  STANDING_LINES,
-  WING_ORDER,
-  dressStatus,
-  overlayLocal,
-  type SquadronBeing,
-} from "@/lib/squadron";
 import { useStation } from "@/lib/store";
 import { cn } from "@/lib/utils";
 
@@ -65,22 +60,21 @@ function speak(text: string) {
 
 function ConductorPage() {
   const localSeated = useStation((s) => s.localSeated);
-  const [running, setRunning] = useState<{ name: string }[]>([]);
+  const [feed, setFeed] = useState<ConductorFeed | null>(null);
   const [wing, setWing] = useState<string>("all");
   const [flag, setFlag] = useState<ConductorStatus | "all">("all");
   const [selId, setSelId] = useState<string | null>(null);
-  const [line, setLine] = useState(0);
   const [rulings, setRulings] = useState<Record<string, "accept" | "back">>({});
 
   useEffect(() => {
     let cancelled = false;
     async function tick() {
       await pullLocal();
-      const feed = await pullConductorFeed();
+      const next = await pullConductorFeed();
       if (cancelled) return;
-      if (feed) {
-        publishConductor(feed);
-        setRunning(feed.running ?? []);
+      if (next) {
+        publishConductor(next);
+        setFeed(next);
       }
     }
     void tick();
@@ -92,7 +86,8 @@ function ConductorPage() {
     };
   }, []);
 
-  const beings = useMemo(() => overlayLocal(SQUADRON, running), [running]);
+  const beings = feed?.beings ?? [];
+  const running = feed?.running ?? [];
   const ranked = useMemo(
     () =>
       [...beings].sort(
@@ -113,7 +108,7 @@ function ConductorPage() {
   const clean = beings.filter((b) => b.status === "clean").length;
   const review = beings.filter((b) => b.status === "review" || b.status === "blocked").length;
 
-  const wings = WING_ORDER.map((name) => ({
+  const wings = [...new Set(beings.map((b) => b.wing).filter(Boolean))].map((name) => ({
     name,
     count: beings.filter((b) => b.wing === name).length,
   }));
@@ -125,10 +120,14 @@ function ConductorPage() {
     { key: "clean", name: "Accepted", count: clean, status: "clean" },
   ];
 
-  const standing = STANDING_LINES[line % STANDING_LINES.length];
+  const standing =
+    feed?.standing ??
+    (localSeated
+      ? `${running.length} named program(s) on this computer. Browser tabs are not programs.`
+      : "Honesty Local is quiet. Conductor has no process list to take.");
   const cycle = new Date().toISOString().slice(0, 10);
 
-  function rule(being: SquadronBeing, kind: "accept" | "back") {
+  function rule(being: ConductorBeing, kind: "accept" | "back") {
     setRulings((prev) => ({ ...prev, [being.id]: kind }));
     useStation.getState().addEvent({
       id: `conductor-${kind}-${being.id}-${Date.now()}`,
@@ -153,7 +152,7 @@ function ConductorPage() {
           <div>
             <p className="font-cd text-[1.7rem] leading-none tracking-tight">The Conductor</p>
             <p className="mt-1.5 font-cd-mono text-[10px] uppercase tracking-[0.22em] text-cd-mute">
-              Christman AI Stack · Agent check-in authority
+              Honesty reports here · this computer
             </p>
           </div>
           <div className="hidden h-10 w-px bg-cd-line sm:block" />
@@ -185,7 +184,7 @@ function ConductorPage() {
           <button
             type="button"
             className="inline-flex min-h-11 items-center border border-cd-line px-4 font-cd-mono text-[11px] uppercase tracking-[0.14em] text-cd-cyan"
-            onClick={() => speak(`${standing} Ninety-nine beings on the roll.`)}
+            onClick={() => speak(standing)}
           >
             Read this to me
           </button>
@@ -195,7 +194,7 @@ function ConductorPage() {
       <div className="grid min-h-[calc(100dvh-5rem)] lg:grid-cols-[240px_1fr]">
         <aside className="order-2 border-b border-cd-line bg-cd-raised py-5 lg:order-none lg:border-b-0 lg:border-r">
           <p className="px-4 pb-3 font-cd-mono text-[10px] uppercase tracking-[0.2em] text-cd-mute">
-            Divisions · {beings.length} beings
+            On this computer · {beings.length}
           </p>
           <button
             type="button"
@@ -205,7 +204,7 @@ function ConductorPage() {
               wing === "all" ? "border-cd-cyan bg-cd-panel text-cd-fg" : "border-transparent text-cd-mute",
             )}
           >
-            <span>All wings</span>
+            <span>All</span>
             <span className="font-cd-mono text-[11px]">{beings.length}</span>
           </button>
           {wings.map((item) => (
@@ -255,17 +254,17 @@ function ConductorPage() {
               {standing}
             </p>
             <p className="mt-3 max-w-[74ch] text-sm leading-relaxed text-cd-mute">
-              Safety-program check-in. Evidence or it did not happen. This board is the roll call.
-              It is not a clearance stamp, not a 510(k), and not a claim of FDA approval.
+              Honesty reports to this board. Named programs on this computer. Not a kernel.
+              Not a clearance stamp. Not someone else’s machine.
             </p>
           </section>
 
           <div className="mt-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
             {[
-              { label: "On the roll", value: beings.length, note: "full squadron", status: "clean" as const },
-              { label: "Accepted", value: clean, note: "evidence on file", status: "clean" as const },
-              { label: "Awaiting ruling", value: review, note: "intentions only", status: "review" as const },
-              { label: "Dark", value: dark, note: "silence on the wire", status: "dark" as const },
+              { label: "Catalog", value: beings.length, note: "named programs", status: "clean" as const },
+              { label: "Running", value: clean, note: "in the process list", status: "clean" as const },
+              { label: "Seen before", value: review, note: "not running now", status: "review" as const },
+              { label: "Dark", value: dark, note: "quiet more than a day", status: "dark" as const },
             ].map((tile) => (
               <div
                 key={tile.label}
@@ -280,7 +279,7 @@ function ConductorPage() {
 
           <div className="mt-8 mb-3 flex flex-wrap items-baseline justify-between gap-3">
             <h1 className="font-cd text-[1.4rem] font-normal text-cd-fg">
-              {wing === "all" ? "The squadron" : wing}
+              {wing === "all" ? "This computer" : wing}
             </h1>
             <p className="font-cd-mono text-[11px] text-cd-mute">
               {shown.length} shown · sorted by risk
@@ -331,11 +330,15 @@ function ConductorPage() {
 
           {selected ? (
             <section className="mt-6 border border-cd-line bg-cd-panel p-5">
-              <p className="font-cd-mono text-[10px] uppercase tracking-[0.2em] text-cd-mute">{selected.division}</p>
+              <p className="font-cd-mono text-[10px] uppercase tracking-[0.2em] text-cd-mute">
+                {selected.division ?? selected.wing}
+              </p>
               <h2 className="mt-2 font-cd text-3xl font-light text-cd-fg">{selected.name}</h2>
               <p className="mt-1 text-sm text-cd-mute">{selected.title}</p>
               <p className="mt-4 max-w-[70ch] text-sm leading-relaxed text-cd-fg">{selected.mandate}</p>
-              <p className="mt-3 max-w-[70ch] text-sm leading-relaxed text-cd-mute">{selected.focus}</p>
+              {selected.focus ? (
+                <p className="mt-3 max-w-[70ch] text-sm leading-relaxed text-cd-mute">{selected.focus}</p>
+              ) : null}
               <div className="mt-5 flex flex-wrap gap-2">
                 <button
                   type="button"

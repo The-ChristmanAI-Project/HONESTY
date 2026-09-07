@@ -14,20 +14,18 @@ Honesty Local publishes a Conductor-shaped snapshot and paints it live.
 
 The desk page is /conductor. It polls the same feed and broadcasts on channel honesty-conductor.
 
-## Full squadron dress
+## What the desk board is
 
-The desk route `/conductor` is The Conductor in dress: Newsreader, JetBrains Mono, cyan rail, ninety-nine beings, standing order, Accept / Send back.
+Honesty reports to Conductor. The desk route `/conductor` paints the Honesty Local catalog for **this computer**: running is clean, seen-but-quiet is review, never seen is empty.
 
-It is the safety-program board. It is not a 510(k), not Class II, and not an FDA clearance stamp. Evidence or it did not happen.
-
-Honesty Local still seats on 8787. When Local is up, matching desktop programs mark clean on this board.
+It is not a 510(k), not Class II, and not an FDA clearance stamp. It is not a private roster of beings. A private roster file, if present on the home station, stays on that machine and is not in this repository.
 
 ## How to run the hook
 
 1. Start Honesty Local (Start Honesty.bat or Start Honesty.command)
 2. Open the rail: http://127.0.0.1:8787/conductor
 3. Open the desk Conductor page
-4. Leave both open. Running programs show clean. Seen-but-quiet show review. Never seen show empty.
+4. Leave both open. That computer’s named programs show. Running is clean. Seen-but-quiet is review. Never seen is empty.
 5. Optional: seat a Conductor ingest URL. Honesty will POST after every scan.
 
 ## Honest limits

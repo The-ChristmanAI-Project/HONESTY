@@ -16,6 +16,7 @@ docket
 honesty-local/honesty-ledger.json
 honesty-local/conductor-hook.json
 honesty-local/conductor-outbox.json
+honesty-local/squadron.local.json
 honesty-local/*.json.tmp
 honesty-logo-640.png
 .grok/preview.log

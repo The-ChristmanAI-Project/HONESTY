@@ -22,7 +22,28 @@ export type ConductorBeing = {
   pids: string[];
   mandate: string;
   lastAt: string | null;
+  division?: string;
+  focus?: string;
+  private?: boolean;
 };
+
+export const RISK: Record<ConductorStatus, number> = {
+  dark: 0,
+  empty: 1,
+  blocked: 2,
+  review: 3,
+  clean: 4,
+};
+
+export function dressStatus(
+  status: ConductorStatus,
+): { label: string; tone: "sage" | "paper" | "muted" | "danger" } {
+  if (status === "clean") return { label: "On this computer", tone: "sage" };
+  if (status === "review") return { label: "Seen, not running", tone: "paper" };
+  if (status === "blocked") return { label: "Blocked", tone: "paper" };
+  if (status === "empty") return { label: "Not seen here", tone: "muted" };
+  return { label: "Dark", tone: "danger" };
+}
 
 export type ConductorFeed = {
   source: string;
@@ -38,6 +59,7 @@ export type ConductorFeed = {
   ledger: { at: string; kind: string; name: string; summary: string }[];
   running: { name: string; count: number; pids: string[] }[];
   note: string;
+  standing?: string;
 };
 
 export function hoursAgo(iso: string | null | undefined): number | null {
@@ -128,6 +150,7 @@ export function feedFromLocal(snap: LocalSnapshot): ConductorFeed {
     note:
       snap.note ??
       "Honesty Local reads this computer's process list. Browser tabs are not separate programs.",
+    standing: `${(snap.running ?? []).length} named program(s) running on ${snap.machine}. Browser tabs are not programs.`,
   };
 }
 
