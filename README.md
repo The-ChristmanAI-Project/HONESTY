@@ -37,6 +37,7 @@ When Honesty Local is up, the desk polls `http://127.0.0.1:8787`. The desk split
 | Binds printed | `769aa74` | **294** |
 | Current (process list + which model is answering) | `8844e16` | **861** |
 | Current (only the model answering now) | `5cd79bd` | **984** |
+| Current (chair on 8765 is not Grok) | `2d7fe94` | **987** |
 
 ---
 
