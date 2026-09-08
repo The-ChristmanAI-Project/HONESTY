@@ -115,6 +115,9 @@ function Breakdown({ result }: { result: BenchResult }) {
         <div className="flex flex-wrap items-center gap-2">
           <h2 className="text-xl">{result.filename}</h2>
           <Badge>{stamp(result.duration || 0)}</Badge>
+          {result.disk ? (
+            <p className="mt-2 w-full font-mono text-xs text-subtle">{result.disk}</p>
+          ) : null}
           <Badge tone={result.watched ? "sage" : "muted"}>
             {result.watched ? `watched · ${result.watcher}` : "not watched"}
           </Badge>

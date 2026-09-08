@@ -4,11 +4,13 @@ Filament on :4850 hears. Lucent on :9785 holds the light. ffmpeg pulls
 frames. No cloud eye. No invented picture. No invented speech.
 """
 from __future__ import annotations
-import json, os, shutil, subprocess, tempfile, urllib.error, urllib.request
+import json, os, shutil, subprocess, urllib.error, urllib.request
+from datetime import datetime, timezone
 from pathlib import Path
 
 FILAMENT = os.environ.get("FILAMENT_STT", "http://127.0.0.1:4850/stt")
 LUCENT = os.environ.get("LUCENT_LIVE", "http://127.0.0.1:9785/api/lucent/live")
+EVIDENCE = Path(os.environ.get("BENCH_EVIDENCE", "/Volumes/ELEMENTS/EVIDENCE"))
 
 
 def which_ffmpeg():
@@ -387,64 +389,80 @@ def parse_watch_json(text, frames):
     return {"watch": watch, "breakdown": breakdown}
 
 
+def evidence_bag(filename):
+    volume = Path("/Volumes/ELEMENTS")
+    if not volume.exists():
+        raise RuntimeError("ELEMENTS is not mounted. Recordings live on /Volumes/ELEMENTS/EVIDENCE.")
+    EVIDENCE.mkdir(parents=True, exist_ok=True)
+    stamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H%M%SZ")
+    stem = Path(filename or "recording").stem[:80] or "recording"
+    bag = EVIDENCE / f"{stamp}_{stem}"
+    bag.mkdir(parents=True, exist_ok=False)
+    return bag
+
+
 def process_recording(raw, filename, xai_key=""):
     which_ffmpeg()
     suffix = Path(filename or "tape.mp4").suffix or ".mp4"
-    work = Path(tempfile.mkdtemp(prefix="honesty-bench-"))
-    src = work / f"source{suffix}"
+    work = evidence_bag(filename)
+    src = work / f"original{suffix}"
     wav = work / "heard.wav"
     frames_dir = work / "frames"
-    try:
-        src.write_bytes(raw)
-        meta = probe_media(src)
-        if not meta["has_audio"] and not meta["has_video"]:
-            raise RuntimeError("That file has no audio and no picture.")
-        heard = {"text": "", "words": [], "engine": None, "note": None}
-        if meta["has_audio"]:
-            extract_wav(src, wav)
-            heard = hear_wav(wav)
-        frames = []
-        if meta["has_video"]:
-            frames = extract_frames(src, frames_dir, meta["duration"])
-        watched = False
-        watcher = None
-        watch_rows = [{"at": f["at"], "seen": ""} for f in frames]
-        breakdown = ""
-        watch_error = None
-        if frames:
-            try:
-                result = watch_with_lucent(frames, heard.get("words") or [])
-                watcher = "Lucent"
-                watch_rows = result["watch"]
-                breakdown = result["breakdown"]
-                watched = True
-                for frame, row in zip(frames, watch_rows):
-                    frame["seen"] = row.get("seen") or ""
-            except RuntimeError as exc:
-                watch_error = str(exc)
-        compare = align(heard.get("words") or [], frames)
-        return {
-            "ok": True,
-            "filename": Path(filename or "recording").name,
-            "duration": meta["duration"],
-            "width": meta["width"],
-            "height": meta["height"],
-            "has_audio": meta["has_audio"],
-            "has_video": meta["has_video"],
-            "heard": heard.get("text") or "",
-            "words": heard.get("words") or [],
-            "ear": heard.get("engine"),
-            "ear_note": heard.get("note"),
-            "watched": watched,
-            "watcher": watcher,
-            "watch_error": watch_error,
-            "watch": watch_rows,
-            "compare": compare,
-            "breakdown": breakdown,
-            "frames": len(frames),
-        }
-    finally:
-        shutil.rmtree(work, ignore_errors=True)
+    src.write_bytes(raw)
+    meta = probe_media(src)
+    if not meta["has_audio"] and not meta["has_video"]:
+        raise RuntimeError("That file has no audio and no picture.")
+    heard = {"text": "", "words": [], "engine": None, "note": None}
+    if meta["has_audio"]:
+        extract_wav(src, wav)
+        heard = hear_wav(wav)
+    frames = []
+    if meta["has_video"]:
+        frames = extract_frames(src, frames_dir, meta["duration"])
+    watched = False
+    watcher = None
+    watch_rows = [{"at": f["at"], "seen": ""} for f in frames]
+    breakdown = ""
+    watch_error = None
+    if frames:
+        try:
+            result = watch_with_lucent(frames, heard.get("words") or [])
+            watcher = "Lucent"
+            watch_rows = result["watch"]
+            breakdown = result["breakdown"]
+            watched = True
+            for frame, row in zip(frames, watch_rows):
+                frame["seen"] = row.get("seen") or ""
+        except RuntimeError as exc:
+            watch_error = str(exc)
+    compare = align(heard.get("words") or [], frames)
+    packet = {
+        "ok": True,
+        "filename": Path(filename or "recording").name,
+        "duration": meta["duration"],
+        "width": meta["width"],
+        "height": meta["height"],
+        "has_audio": meta["has_audio"],
+        "has_video": meta["has_video"],
+        "heard": heard.get("text") or "",
+        "words": heard.get("words") or [],
+        "ear": heard.get("engine"),
+        "ear_note": heard.get("note"),
+        "watched": watched,
+        "watcher": watcher,
+        "watch_error": watch_error,
+        "watch": watch_rows,
+        "compare": compare,
+        "breakdown": breakdown,
+        "frames": len(frames),
+        "disk": str(work),
+    }
+    (work / "packet.json").write_text(json.dumps(packet, indent=2), encoding="utf-8")
+    if packet["heard"]:
+        (work / "transcript.txt").write_text(packet["heard"] + "\n", encoding="utf-8")
+    if packet["breakdown"]:
+        (work / "breakdown.txt").write_text(packet["breakdown"] + "\n", encoding="utf-8")
+    return packet
 
 
 def self_test():
@@ -458,4 +476,5 @@ def self_test():
     )
     assert rows[0]["said"] == "hello desk"
     assert rows[1]["fit"] == "picture-no-speech"
+    assert str(EVIDENCE) == os.environ.get("BENCH_EVIDENCE", "/Volumes/ELEMENTS/EVIDENCE")
     return 0
