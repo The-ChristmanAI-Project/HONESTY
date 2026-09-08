@@ -34,7 +34,7 @@ export const KEY_SLOTS: {
   { id: "aws", label: "AWS", hint: "access key, secret, region" },
   { id: "openai", label: "OpenAI", hint: "OPENAI_API_KEY" },
   { id: "anthropic", label: "Anthropic", hint: "ANTHROPIC_API_KEY" },
-  { id: "xai", label: "xAI", hint: "XAI_API_KEY — so the bench can watch the picture" },
+  { id: "xai", label: "xAI", hint: "XAI_API_KEY" },
 ];
 
 const ALIASES: Record<string, keyof KeyVault> = {

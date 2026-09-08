@@ -77,8 +77,7 @@ function BenchPage() {
       >
         <p className="font-display text-2xl text-fg">Drop a screen recording here.</p>
         <p className="mt-2 text-sm text-muted">
-          Video with sound. The ear is Filament on this computer. Watching needs an xAI key on
-          Keys, or a vision model in Ollama.
+          Video with sound. Filament hears. Lucent watches the picture against those words.
         </p>
         <label className="mt-6 inline-flex min-h-12 cursor-pointer items-center justify-center rounded-md bg-accent px-5 text-base font-medium text-accent-fg">
           Choose file

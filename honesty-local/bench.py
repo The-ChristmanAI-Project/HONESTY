@@ -1,16 +1,14 @@
 """Screen recording bench — hear the tape, watch the picture, compare.
 
-Filament on :4850 hears. ffmpeg pulls frames. A seated xAI or Ollama
-vision model watches. No invented picture. No invented speech.
+Filament on :4850 hears. Lucent on :9785 holds the light. ffmpeg pulls
+frames. No cloud eye. No invented picture. No invented speech.
 """
 from __future__ import annotations
 import json, os, shutil, subprocess, tempfile, urllib.error, urllib.request
 from pathlib import Path
 
 FILAMENT = os.environ.get("FILAMENT_STT", "http://127.0.0.1:4850/stt")
-OLLAMA = os.environ.get("OLLAMA_HOST", "http://127.0.0.1:11434").rstrip("/")
-XAI_CHAT = "https://api.x.ai/v1/chat/completions"
-VISION_MARK = ("llava", "bakllava", "minicpm", "qwen2.5vl", "qwen-vl", "gemma3", "moondream", "vision")
+LUCENT = os.environ.get("LUCENT_LIVE", "http://127.0.0.1:9785/api/lucent/live")
 
 
 def which_ffmpeg():
@@ -150,6 +148,120 @@ def align(words, frames):
             "fit": fit,
         })
     return rows
+
+
+def jpeg_size(path):
+    data = Path(path).read_bytes()
+    i = 0
+    n = len(data)
+    while i < n - 8:
+        if data[i] != 0xFF:
+            i += 1
+            continue
+        marker = data[i + 1]
+        if marker in (0xC0, 0xC1, 0xC2):
+            height = int.from_bytes(data[i + 5:i + 7], "big")
+            width = int.from_bytes(data[i + 7:i + 9], "big")
+            return width, height
+        if marker == 0xD8 or marker == 0x01 or (0xD0 <= marker <= 0xD9):
+            i += 2
+            continue
+        if i + 3 >= n:
+            break
+        length = int.from_bytes(data[i + 2:i + 4], "big")
+        i += 2 + length
+    return 0, 0
+
+
+def gray_thumb(path):
+    ffmpeg, _ = which_ffmpeg()
+    proc = subprocess.run(
+        [ffmpeg, "-v", "error", "-i", str(path), "-vf", "scale=160:90", "-f", "rawvideo", "-pix_fmt", "gray", "pipe:1"],
+        capture_output=True, check=False,
+    )
+    return proc.stdout if proc.returncode == 0 else b""
+
+
+def motion(prev, now):
+    if not prev or not now or len(prev) != len(now):
+        return 0.0
+    step = 4
+    total = 0
+    n = 0
+    for i in range(0, len(now), step):
+        total += abs(now[i] - prev[i])
+        n += 1
+    return (total / n / 255.0) if n else 0.0
+
+
+def lucent_hold(path, kind="file"):
+    import base64
+    raw = Path(path).read_bytes()
+    b64 = base64.b64encode(raw).decode("ascii")
+    if len(b64) > 400_000:
+        b64 = b64[:400_000]
+    width, height = jpeg_size(path)
+    payload = json.dumps({
+        "seeing": True,
+        "b64": b64,
+        "width": width,
+        "height": height,
+        "kind": kind,
+    }).encode("utf-8")
+    req = urllib.request.Request(
+        LUCENT, data=payload, method="POST",
+        headers={"Content-Type": "application/json", "User-Agent": "Honesty-Local"},
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=8) as res:
+            body = json.loads(res.read().decode("utf-8"))
+    except (urllib.error.URLError, TimeoutError, OSError, urllib.error.HTTPError) as exc:
+        raise RuntimeError("Lucent did not see. The house on 9785 is quiet.") from exc
+    if not isinstance(body, dict) or body.get("ok") is False:
+        raise RuntimeError(str((body or {}).get("error") or "Lucent refused that frame."))
+    if not body.get("seeing"):
+        raise RuntimeError("Lucent took the frame and did not mark seeing.")
+    return body
+
+
+def watch_with_lucent(frames, words):
+    watch = []
+    lines = []
+    prev = None
+    moved_n = 0
+    held_n = 0
+    for frame in frames:
+        live = lucent_hold(frame["path"], kind="file")
+        gray = gray_thumb(frame["path"])
+        delta = motion(prev, gray) if prev else 0.0
+        prev = gray
+        moved = delta > 0.04
+        if moved:
+            moved_n += 1
+            motion_bit = "picture moved"
+        else:
+            held_n += 1
+            motion_bit = "picture held"
+        w = live.get("width") or 0
+        h = live.get("height") or 0
+        said = words_near(words, frame["at"])
+        seen = f"Lucent held {w}×{h} file light · {motion_bit}"
+        watch.append({"at": frame["at"], "seen": seen})
+        if said and moved:
+            lines.append(f"At {frame['at']:.1f}s Filament heard “{said}” while Lucent's picture moved.")
+        elif said and not moved:
+            lines.append(f"At {frame['at']:.1f}s Filament heard “{said}” while Lucent's picture held.")
+        elif moved:
+            lines.append(f"At {frame['at']:.1f}s Lucent saw the picture move. No speech.")
+        else:
+            lines.append(f"At {frame['at']:.1f}s Lucent held still light. No speech.")
+    breakdown = (
+        f"Lucent held {len(frames)} frame{'' if len(frames)==1 else 's'} of this recording. "
+        f"{moved_n} moved. {held_n} held. Filament heard the tape. "
+        "Lucent does not invent a scene. This is speech against the light that actually landed.\n\n"
+        + "\n".join(lines)
+    )
+    return {"watch": watch, "breakdown": breakdown}
 
 
 def pick_ollama_vision():
@@ -300,22 +412,12 @@ def process_recording(raw, filename, xai_key=""):
         breakdown = ""
         watch_error = None
         if frames:
-            key = (xai_key or os.environ.get("XAI_API_KEY") or "").strip()
             try:
-                if key:
-                    result = watch_with_xai(frames, heard.get("text") or "", key)
-                    watcher = "xAI"
-                else:
-                    model = pick_ollama_vision()
-                    if not model:
-                        raise RuntimeError(
-                            "Heard the tape. Could not watch the picture. Seat an xAI key on Keys, or load a vision model in Ollama."
-                        )
-                    result = watch_with_ollama(frames, heard.get("text") or "", model)
-                    watcher = f"Ollama {model}"
+                result = watch_with_lucent(frames, heard.get("words") or [])
+                watcher = "Lucent"
                 watch_rows = result["watch"]
                 breakdown = result["breakdown"]
-                watched = any(row.get("seen") for row in watch_rows) or bool(breakdown)
+                watched = True
                 for frame, row in zip(frames, watch_rows):
                     frame["seen"] = row.get("seen") or ""
             except RuntimeError as exc:
