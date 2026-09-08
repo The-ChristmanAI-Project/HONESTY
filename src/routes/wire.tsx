@@ -133,15 +133,15 @@ function WirePage() {
     setSummary("");
     setMinutes("");
     setWhen(toLocalInput());
-    toast("On the wire. Yours.");
+    toast("Recorded.");
   }
 
   return (
     <div className="mx-auto max-w-5xl">
-      <PageHeader kicker="The wire" title="All communication. Yours.">
-        No subscription. No lock. This desk keeps every channel it can see and every word you
-        write. Mail, calendar, Outlook, and Teams load if they are already seated — optional.
-        Calls, SMS, iMessage, Signal, WhatsApp: record them. A phone tap is not claimed.
+      <PageHeader kicker="Mail, calls, texts" title="All communication. Yours.">
+        Mail, calls, texts, meetings. This desk keeps every channel it can see and every word
+        you write. Calendar, Outlook, and Teams load if they are already connected — optional.
+        SMS, iMessage, Signal, WhatsApp: record them. A phone tap is not claimed.
       </PageHeader>
 
       <dl className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -157,7 +157,7 @@ function WirePage() {
 
       <div className="mt-6 flex flex-wrap items-center gap-2">
         <Button variant="secondary" onClick={() => void pullTheWire(true)} disabled={pullingMail}>
-          {pullingMail ? "Pulling the wire" : "Pull the wire"}
+          {pullingMail ? "Loading mail" : "Load mail"}
         </Button>
         {mailLoginRequired && mailLoginUrl ? (
           <Button
@@ -174,7 +174,9 @@ function WirePage() {
             Continue with Grok to load your data.
           </Button>
         ) : null}
-        <Badge tone={comms.length ? "sage" : "muted"}>{comms.length} on the wire</Badge>
+        <Badge tone={comms.length ? "sage" : "muted"}>
+          {comms.length} recorded
+        </Badge>
       </div>
       {mailWarning ? <p className="mt-3 text-sm text-muted">{mailWarning}</p> : null}
       {wireSources.length > 0 ? (
@@ -252,13 +254,13 @@ function WirePage() {
               placeholder="Subject, outcome, or the words themselves"
             />
           </label>
-          <Button type="submit">Put it on the wire</Button>
+          <Button type="submit">Record it</Button>
         </form>
       </Panel>
 
       <Panel className="mt-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <h2 className="text-xl">{view === "traffic" ? "Traffic" : "People on the wire"}</h2>
+          <h2 className="text-xl">{view === "traffic" ? "What passed" : "People"}</h2>
           <div className="flex flex-wrap gap-1">
             <Chip active={view === "traffic"} onClick={() => setView("traffic")}>
               Traffic
@@ -273,7 +275,7 @@ function WirePage() {
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Search names, subjects, words"
-          aria-label="Search the wire"
+          aria-label="Search mail, calls, and texts"
         />
         <div className="mt-3 flex flex-wrap gap-1">
           {FILTERS.map((item) => (
@@ -292,7 +294,7 @@ function WirePage() {
         ) : (
           <ul className="mt-4 divide-y divide-border">
             {threads.length === 0 ? (
-              <li className="py-10 text-sm text-muted">No people on the wire yet. Record a communication.</li>
+              <li className="py-10 text-sm text-muted">No people yet. Record a mail, call, or text.</li>
             ) : (
               threads.map((thread) => (
                 <li key={thread.key} className="flex flex-wrap items-start justify-between gap-3 py-4">

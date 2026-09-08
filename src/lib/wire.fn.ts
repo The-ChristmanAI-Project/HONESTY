@@ -189,7 +189,7 @@ export const pullWire = createServerFn({ method: "POST" }).handler(
     let warning: string | null = null;
     if (seated.length === 0) {
       warning =
-        "Mail, calendar, Outlook, and Teams are optional. This desk is yours either way. Record calls, texts, and meetings by hand. Pull the wire loads seated channels when they exist.";
+        "Mail, calendar, Outlook, and Teams are optional. This desk is yours either way. Record calls, texts, and meetings by hand. Load mail pulls seated channels when they exist.";
     } else {
       const missing = sources.filter((source) => !source.seated).map((source) => source.label);
       if (missing.length) warning = `${missing.join(", ")} optional — not seated.`;

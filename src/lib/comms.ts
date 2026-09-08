@@ -30,7 +30,7 @@ export function deriveChannels(events: AccessEvent[]): ChannelCount[] {
   const github = comms.filter((event) => event.source === "github").length;
   const hand = comms.filter((event) => event.source === "wire").length;
   return [
-    { key: "all", label: "On the wire", count: comms.length },
+    { key: "all", label: "All", count: comms.length },
     { key: "mail", label: "Mail", count: mail },
     { key: "call", label: "Call", count: call },
     { key: "message", label: "Text", count: message },

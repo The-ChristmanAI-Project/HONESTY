@@ -110,6 +110,19 @@ export type NamedAi = {
   runningFrom?: "hand" | "local";
 };
 
+export type DatacenterModel = {
+  id: string;
+  name: string;
+  provider: string;
+  where: "local" | "datacenter";
+  role: "reasoning" | "chat";
+  status: "in_use" | "reachable" | "configured";
+  source: string;
+  host?: string | null;
+  via?: string | null;
+  at?: string | null;
+};
+
 export type AiSystem = {
   id: string;
   name: string;

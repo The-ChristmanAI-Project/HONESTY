@@ -1,4 +1,6 @@
+import { reasoningLine } from "./datacenter";
 import { probeLocal, type LocalSnapshot } from "./local-agent";
+import type { DatacenterModel } from "./types";
 
 export const LOCAL_BIND = "127.0.0.1:8787";
 export const DESK_BIND = "0.0.0.0:8788";
@@ -58,6 +60,8 @@ export type ConductorFeed = {
   beings: ConductorBeing[];
   ledger: { at: string; kind: string; name: string; summary: string }[];
   running: { name: string; count: number; pids: string[] }[];
+  models?: DatacenterModel[];
+  model_note?: string | null;
   note: string;
   standing?: string;
 };
@@ -147,10 +151,18 @@ export function feedFromLocal(snap: LocalSnapshot): ConductorFeed {
     beings,
     ledger: snap.ledger ?? [],
     running: snap.running ?? [],
+    models: snap.models ?? [],
+    model_note: snap.model_note ?? null,
     note:
       snap.note ??
-      "Honesty Local reads this computer's process list. Browser tabs are not separate programs.",
-    standing: `${(snap.running ?? []).length} named program(s) running on ${snap.machine}. Browser tabs are not programs.`,
+      "Honesty Local reads this computer's process list and which model is answering. Browser tabs are not separate programs.",
+    standing: [
+      `${(snap.running ?? []).length} named program(s) running on ${snap.machine}.`,
+      reasoningLine(snap.models ?? [])
+        ? `Answering now: ${reasoningLine(snap.models ?? [])}.`
+        : "No model answering right now.",
+      "Browser tabs are not programs.",
+    ].join(" "),
   };
 }
 

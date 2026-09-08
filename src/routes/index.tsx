@@ -3,14 +3,22 @@ import { RefreshCw } from "lucide-react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { EventFeed } from "@/components/event-feed";
+import { UnknownPersonRow } from "@/components/unknown-person";
 import { PageHeader } from "@/components/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Chip } from "@/components/ui/chip";
 import { Panel } from "@/components/ui/panel";
-import { deriveAiSystems, eventTouchesAnyAi, isOutsideEvent, isOutsidePerson } from "@/lib/ai-scan";
-import { deriveChannels, deriveThreads } from "@/lib/comms";
-import { deriveActors, deriveFiles, isComms } from "@/lib/github";
+import { deriveAiSystems, eventTouchesAnyAi, isAiLogin, isOutsideEvent } from "@/lib/ai-scan";
+import { deriveThreads } from "@/lib/comms";
+import { deriveUnknownPeople } from "@/lib/people";
+import {
+  fromTheirComputers,
+  modelPlainLine,
+  onYourComputerModels,
+  statusLabel,
+} from "@/lib/datacenter";
+import { deriveFiles, isComms } from "@/lib/github";
 import { pullTheRecord, pullTheWire } from "@/lib/pull";
 import { useStation } from "@/lib/store";
 import { relTime } from "@/lib/time";
@@ -30,30 +38,39 @@ function Desk() {
   const namedAis = useStation((s) => s.namedAis);
   const localSeated = useStation((s) => s.localSeated);
   const localMachine = useStation((s) => s.localMachine);
+  const datacenterModels = useStation((s) => s.datacenterModels);
   const liveLocal = namedAis.filter((ai) => ai.running && ai.runningFrom === "local");
+  const theirModels = fromTheirComputers(datacenterModels);
+  const localModels = onYourComputerModels(datacenterModels);
   const files = useMemo(() => deriveFiles(events), [events]);
-  const actors = useMemo(() => deriveActors(events), [events]);
   const comms = useMemo(() => events.filter(isComms), [events]);
-  const channels = useMemo(() => deriveChannels(events), [events]);
   const threads = useMemo(() => deriveThreads(events), [events]);
   const systems = useMemo(
     () => deriveAiSystems(events, namedAis, armed),
     [events, namedAis, armed],
   );
-  const [filter, setFilter] = useState<"all" | "github" | "wire" | "outside" | "ai">("all");
+  const [filter, setFilter] = useState<"all" | "github" | "mail" | "outside" | "ai">("all");
+  const FILTER_LABEL = {
+    all: "all",
+    github: "GitHub",
+    mail: "mail",
+    ai: "AIs",
+    outside: "strangers",
+  } as const;
 
-  const voiceCount =
-    (channels.find((c) => c.key === "call")?.count ?? 0) +
-    (channels.find((c) => c.key === "meeting")?.count ?? 0);
-
-  const outside = actors.filter((actor) =>
-    isOutsidePerson(actor.login, settings.githubUser, known, namedAis),
+  const unknownPeople = useMemo(
+    () =>
+      deriveUnknownPeople(events, settings.githubUser, known, namedAis, (login) =>
+        isAiLogin(login, namedAis),
+      ),
+    [events, settings.githubUser, known, namedAis],
   );
+  const outside = unknownPeople;
 
   const shown = useMemo(() => {
     return events.filter((event) => {
       if (filter === "github") return event.source === "github";
-      if (filter === "wire") return isComms(event);
+      if (filter === "mail") return isComms(event);
       if (filter === "ai") return eventTouchesAnyAi(event, systems);
       if (filter === "outside") {
         return isOutsideEvent(event, settings.githubUser, known, namedAis);
@@ -66,7 +83,7 @@ function Desk() {
     const next = !armed;
     useStation.getState().setArmed(next);
     if (next) {
-      toast("Watch armed. Scanning AI systems, then following each in the record.");
+      toast("Watching. Checking GitHub, mail, and AIs.");
       await pullTheRecord();
       await pullTheWire();
       const found = deriveAiSystems(
@@ -75,10 +92,10 @@ function Desk() {
         true,
       );
       toast(
-        `Scan complete. ${found.length} AI system${found.length === 1 ? "" : "s"} on the watch. Following each.`,
+        `Found ${found.length} AI${found.length === 1 ? "" : "s"}. Following each.`,
       );
     } else {
-      toast("Watch at rest. The ledger stays.");
+      toast("Stopped. Your record stays.");
     }
   }
 
@@ -86,7 +103,7 @@ function Desk() {
     const [record, wire] = await Promise.all([pullTheRecord(), pullTheWire(true)]);
     const n = (record?.events.length ?? 0) + (wire?.events.length ?? 0);
     if (n > 0 || record?.ok) {
-      toast(`Record pulled · ${n} this pass`);
+      toast(`Updated · ${n} this time`);
     } else {
       toast(record?.warnings[0] ?? "Pull returned no events. The ledger you wrote stays.");
     }
@@ -95,58 +112,148 @@ function Desk() {
   return (
     <div className="stagger-in mx-auto max-w-5xl">
       <PageHeader
-        kicker="Home station desk"
+        kicker="Your desk"
         title="The record, without spin."
         actions={
           <>
             <Button size="lg" variant={armed ? "secondary" : "primary"} onClick={() => void onArm()}>
-              {armed ? "Stand down" : "Arm the watch"}
+              {armed ? "Stop watching" : "Start watching"}
             </Button>
             <Button size="lg" variant="ghost" onClick={() => void onPull()} disabled={pulling}>
               <RefreshCw className={cn("size-4", pulling && "animate-spin")} strokeWidth={1.75} />
-              Pull now
+              Refresh
             </Button>
           </>
         }
       >
-        Honesty Local reads named AI programs on this computer. Arm the watch for GitHub, mail,
-        and the wire. Not a kernel hook. Not a paywall.
+        An AI can run in two places: this computer, or the company's computers (Anthropic,
+        NVIDIA, OpenAI). That is not "people you don't know." No paywall.
       </PageHeader>
 
-      <dl className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <Stat label="On the wire" value={comms.length} />
-        <Stat label="AIs" value={systems.length} />
-        <Stat label="Voice" value={voiceCount} />
-        <Stat label="Outside" value={outside.length} alert={outside.length > 0} />
+      <div className="mt-8 grid items-start gap-4 sm:grid-cols-2">
+        <Panel>
+          <p className="kicker">On your computer</p>
+          <h2 className="mt-2 text-xl">Programs here</h2>
+          <p className="mt-1 text-sm text-muted">
+            Claude, Cursor, Ollama — the apps on this machine.
+          </p>
+          <ul className="mt-4 space-y-3">
+            {liveLocal.map((ai) => (
+              <li key={ai.id} className="min-w-0">
+                <p className="truncate font-medium">{ai.name}</p>
+                <p className="font-mono text-xs text-subtle">app on {localMachine ?? "this computer"}</p>
+              </li>
+            ))}
+            {localModels.map((model) => (
+              <li key={`${model.provider}-${model.id}`} className="min-w-0">
+                <p className="truncate font-medium">{model.name}</p>
+                <p className="font-mono text-xs text-subtle">model on this computer</p>
+              </li>
+            ))}
+            {!localSeated ? (
+              <li className="text-sm text-muted">Honesty Local is off. Start it to see apps on this computer.</li>
+            ) : liveLocal.length === 0 && localModels.length === 0 ? (
+              <li className="text-sm text-muted">No named AI app is running here right now.</li>
+            ) : null}
+          </ul>
+        </Panel>
+        <Panel>
+          <p className="kicker">From their computers</p>
+          <h2 className="mt-2 text-xl">The model answering</h2>
+          <p className="mt-1 text-sm text-muted">
+            The company's machine doing the thinking. Not a person. Not a stranger on GitHub.
+          </p>
+          <ul className="mt-4 space-y-3">
+            {theirModels.map((model) => (
+              <li key={`${model.provider}-${model.id}-${model.source}`} className="min-w-0">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="truncate font-medium">{model.name}</p>
+                  <Badge tone={model.status === "in_use" ? "sage" : "muted"}>
+                    {statusLabel(model)}
+                  </Badge>
+                </div>
+                <p className="mt-1 font-mono text-xs text-subtle">{modelPlainLine(model)}</p>
+              </li>
+            ))}
+            {!localSeated ? (
+              <li className="text-sm text-muted">Honesty Local is off. Start it to see who is answering from their computers.</li>
+            ) : theirModels.length === 0 ? (
+              <li className="text-sm text-muted">
+                None we can see yet. Open Claude or Cursor, or save a key on Keys.
+              </li>
+            ) : null}
+          </ul>
+          <Link
+            to="/systems"
+            className="mt-4 inline-flex min-h-11 items-center text-sm text-muted hover:text-fg"
+          >
+            Full list
+          </Link>
+        </Panel>
+      </div>
+
+      <dl className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <Stat label="Mail & calls" value={comms.length} />
+        <Stat label="On your computer" value={liveLocal.length} />
+        <Stat label="From their computers" value={theirModels.length} />
+        <Stat label="People you don't know" value={outside.length} alert={outside.length > 0} />
       </dl>
 
       <div className="mt-4 flex flex-wrap items-center gap-3 text-xs text-muted">
-        <Badge tone={armed ? "sage" : "muted"}>{armed ? "Armed" : "At rest"}</Badge>
+        <Badge tone={armed ? "sage" : "muted"}>{armed ? "Watching" : "Off"}</Badge>
         <span className="font-mono tabular-nums">
-          Last pull {lastFetchedAt ? relTime(lastFetchedAt) : "not yet"}
+          Last update {lastFetchedAt ? relTime(lastFetchedAt) : "not yet"}
         </span>
         <span className="font-mono">@{settings.githubUser}</span>
-        <span className="font-mono">
-          {localSeated
-            ? `${localMachine ?? "Local"}: ${
-                liveLocal.length ? liveLocal.map((ai) => ai.name).join(" · ") : "no named AI running"
-              }`
-            : "Honesty Local quiet"}
-        </span>
       </div>
       {warnings[0] ? <p className="mt-3 text-sm text-danger">{warnings[0]}</p> : null}
       {mailWarning ? (
         <p className="mt-2 text-sm text-muted">Mail is optional. Record by hand either way.</p>
       ) : null}
 
+      <Panel className="mt-6">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <p className="kicker">Not the cloud AI</p>
+            <h2 className="mt-2 text-xl">People you don't know</h2>
+            <p className="mt-1 max-w-[62ch] text-sm text-muted">
+              Accounts that showed up in GitHub, mail, or calls. You have not named them. They
+              are not you. They are not Claude on this computer.
+            </p>
+          </div>
+          <Badge tone={unknownPeople.length ? "danger" : "muted"}>
+            {unknownPeople.length} {unknownPeople.length === 1 ? "person" : "people"}
+          </Badge>
+        </div>
+        <ul className="mt-4 divide-y divide-border">
+          {unknownPeople.slice(0, 6).map((person) => (
+            <li key={person.login}>
+              <UnknownPersonRow person={person} />
+            </li>
+          ))}
+          {unknownPeople.length === 0 ? (
+            <li className="py-4 text-sm text-muted">
+              Nobody unknown in the record right now. A new GitHub account, mail address, or
+              name in a call lands here until you say you know them.
+            </li>
+          ) : null}
+        </ul>
+        <Link
+          to="/people"
+          className="mt-2 inline-flex min-h-11 items-center text-sm text-muted hover:text-fg"
+        >
+          Everyone
+        </Link>
+      </Panel>
+
       <div className="mt-8 grid items-start gap-6 lg:grid-cols-3">
         <Panel className="lg:col-span-2">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <h2 className="text-xl">Live ledger</h2>
             <div className="flex flex-wrap gap-1">
-              {(["all", "github", "wire", "ai", "outside"] as const).map((key) => (
+              {(["all", "github", "mail", "ai", "outside"] as const).map((key) => (
                 <Chip key={key} active={filter === key} onClick={() => setFilter(key)}>
-                  {key}
+                  {FILTER_LABEL[key]}
                 </Chip>
               ))}
             </div>
@@ -156,46 +263,13 @@ function Desk() {
             owner={settings.githubUser}
             known={known}
             isAi={(event) => eventTouchesAnyAi(event, systems)}
-            empty="No events in this filter. Arm the watch or pull the record."
+            empty="Nothing here yet. Start watching, or refresh."
           />
         </Panel>
 
         <div className="flex flex-col gap-6">
           <Panel>
-            <h2 className="text-xl">AI systems</h2>
-            <ul className="mt-4 space-y-3">
-              {systems.slice(0, 6).map((system) => (
-                <li key={system.id} className="min-w-0">
-                  <div className="flex items-center justify-between gap-2">
-                    <p className="truncate text-sm font-medium">{system.name}</p>
-                    <Badge tone={system.running || system.tracking ? "sage" : "muted"}>
-                      {system.running
-                        ? "on this computer"
-                        : system.tracking
-                          ? "following"
-                          : "at rest"}
-                    </Badge>
-                  </div>
-                  <p className="truncate text-xs text-subtle">
-                    {system.eventCount} hits
-                    {system.lastAt ? ` · ${relTime(system.lastAt)}` : " · not seen yet"}
-                  </p>
-                </li>
-              ))}
-              {systems.length === 0 ? (
-                <li className="text-sm text-muted">Arm the watch to scan, or name an AI on Systems.</li>
-              ) : null}
-            </ul>
-            <Link
-              to="/systems"
-              className="mt-4 inline-flex min-h-11 items-center text-sm text-muted hover:text-fg"
-            >
-              Open trackers
-            </Link>
-          </Panel>
-
-          <Panel>
-            <h2 className="text-xl">People on the wire</h2>
+            <h2 className="text-xl">People you talked to</h2>
             <ul className="mt-4 space-y-3">
               {threads.slice(0, 6).map((thread) => (
                 <li key={thread.key} className="min-w-0">
@@ -206,7 +280,7 @@ function Desk() {
                 </li>
               ))}
               {threads.length === 0 ? (
-                <li className="text-sm text-muted">No communication yet. Open the Wire and write it.</li>
+                <li className="text-sm text-muted">No mail or calls yet. Open Mail & calls and write it.</li>
               ) : null}
             </ul>
             <div className="mt-4 flex flex-wrap gap-x-4">
@@ -220,7 +294,7 @@ function Desk() {
                 to="/wire"
                 className="inline-flex min-h-11 items-center text-sm text-muted hover:text-fg"
               >
-                The wire
+                Mail & calls
               </Link>
             </div>
           </Panel>

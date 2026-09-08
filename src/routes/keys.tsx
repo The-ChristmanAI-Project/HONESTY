@@ -27,6 +27,8 @@ import {
   type KeySlotId,
   type KeyVault,
 } from "@/lib/keys";
+import { probeDatacenter } from "@/lib/local-agent";
+import { useStation } from "@/lib/store";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/keys")({ component: KeysPage });
@@ -34,6 +36,9 @@ export const Route = createFileRoute("/keys")({ component: KeysPage });
 function KeysPage() {
   const [vault, setVault] = useState<KeyVault>(EMPTY_VAULT);
   const [over, setOver] = useState(false);
+  const [probing, setProbing] = useState(false);
+  const localSeated = useStation((s) => s.localSeated);
+  const models = useStation((s) => s.datacenterModels);
 
   useEffect(() => {
     setVault(readVault());
@@ -51,20 +56,20 @@ function KeysPage() {
     const files = event.dataTransfer.files;
     if (files.length) {
       const next = await parseDroppedFiles(files, vault);
-      save(next, `Seated ${seatedCount(next)} key slot${seatedCount(next) === 1 ? "" : "s"}.`);
+      save(next, `Saved ${seatedCount(next)} key${seatedCount(next) === 1 ? "" : "s"}.`);
       return;
     }
     const text = event.dataTransfer.getData("text/plain");
     if (text.trim()) {
       const next = parseDroppedText(text, vault);
-      save(next, `Seated ${seatedCount(next)} key slot${seatedCount(next) === 1 ? "" : "s"}.`);
+      save(next, `Saved ${seatedCount(next)} key${seatedCount(next) === 1 ? "" : "s"}.`);
     }
   }
 
   async function onPick(list: FileList | null) {
     if (!list?.length) return;
     const next = await parseDroppedFiles(list, vault);
-    save(next, `Seated ${seatedCount(next)} key slot${seatedCount(next) === 1 ? "" : "s"}.`);
+    save(next, `Saved ${seatedCount(next)} key${seatedCount(next) === 1 ? "" : "s"}.`);
   }
 
   function onPaste(event: ClipboardEvent<HTMLTextAreaElement>) {
@@ -72,7 +77,7 @@ function KeysPage() {
     if (!text.trim()) return;
     event.preventDefault();
     const next = parseDroppedText(text, vault);
-    save(next, `Seated ${seatedCount(next)} key slot${seatedCount(next) === 1 ? "" : "s"}.`);
+    save(next, `Saved ${seatedCount(next)} key${seatedCount(next) === 1 ? "" : "s"}.`);
     event.currentTarget.value = "";
   }
 
@@ -82,7 +87,8 @@ function KeysPage() {
     <div className="mx-auto max-w-3xl">
       <PageHeader kicker="Keys" title="Drop them here.">
         NVIDIA, Ollama, AWS, OpenAI, Anthropic. They stay in this browser. They do not go to
-        GitHub, the ledger, or the wire. Honesty Local stays on 8787. This desk is 8788.
+        GitHub or the ledger. Honesty Local on 8787 can use them once, in memory, to see
+        which model is answering. This desk is 8788.
       </PageHeader>
 
       <div
@@ -126,8 +132,31 @@ function KeysPage() {
       </div>
 
       <p className="mt-4 font-mono text-xs text-subtle">
-        {seated} of {KEY_SLOTS.length} seated · this browser only
+        {seated} of {KEY_SLOTS.length} saved · this browser only
+        {models.length ? ` · ${models.length} model${models.length === 1 ? "" : "s"} last read` : ""}
       </p>
+
+      <Button
+        className="mt-4"
+        variant="secondary"
+        disabled={!localSeated || probing}
+        onClick={() => {
+          setProbing(true);
+          void probeDatacenter(vault).then((ok) => {
+            setProbing(false);
+            const n = useStation.getState().datacenterModels.length;
+            toast(
+              ok
+                ? `Read ${n} model${n === 1 ? "" : "s"}. Keys were not written to disk.`
+                : localSeated
+                  ? "Honesty Local did not answer."
+                  : "Start Honesty Local first.",
+            );
+          });
+        }}
+      >
+        {probing ? "Looking" : "See which model"}
+      </Button>
 
       <ul className="mt-6 grid gap-4">
         {KEY_SLOTS.map((slot) => (
@@ -137,7 +166,7 @@ function KeysPage() {
               label={slot.label}
               hint={slot.hint}
               vault={vault}
-              onSave={(next) => save(next, `${slot.label} seated.`)}
+              onSave={(next) => save(next, `${slot.label} saved.`)}
             />
           </li>
         ))}
@@ -224,7 +253,7 @@ function KeyCard({
           <h2 className="text-xl">{label}</h2>
           <p className="mt-1 font-mono text-xs text-subtle">{hint}</p>
         </div>
-        <Badge tone={seated ? "sage" : "muted"}>{seated ? "seated" : "empty"}</Badge>
+        <Badge tone={seated ? "sage" : "muted"}>{seated ? "saved" : "none"}</Badge>
       </div>
       {seated && id !== "aws" ? (
         <p className="mt-3 font-mono text-sm text-muted">{maskSecret(vault[id])}</p>

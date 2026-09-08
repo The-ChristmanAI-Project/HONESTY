@@ -1,10 +1,11 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { belongsToStation, mergeEvents } from "./github";
-import { pruneStaleLive } from "./local-events";
+import { modelEventId, pruneStaleLive } from "./local-events";
 import { SEED_EVENTS } from "./seed";
 import type {
   AccessEvent,
+  DatacenterModel,
   HonestyReport,
   ManualWatch,
   NamedAi,
@@ -42,6 +43,8 @@ export type StationState = {
   localSeated: boolean;
   localMachine: string | null;
   localPlatform: string | null;
+  datacenterModels: DatacenterModel[];
+  modelNote: string | null;
   settings: StationSettings;
   namedAis: NamedAi[];
   knownActors: string[];
@@ -78,12 +81,15 @@ export type StationState = {
     machine: string;
     platform: string;
     running: { name: string }[];
+    models?: DatacenterModel[];
+    modelNote?: string | null;
     events: AccessEvent[];
   }) => void;
   applyConductor: (feed: {
     machine?: string;
     platform?: string;
     running?: { name: string }[];
+    models?: DatacenterModel[];
     ledger?: { at: string; kind: string; name: string; summary: string }[];
   }) => void;
   markLocalGone: () => void;
@@ -131,6 +137,8 @@ export const useStation = create<StationState>()(
       localSeated: false,
       localMachine: null,
       localPlatform: null,
+      datacenterModels: [],
+      modelNote: null,
       settings: defaultSettings,
       namedAis: [
         { id: "ai-grok", name: "Grok", aliases: ["grok", "xai"], running: false },
@@ -218,9 +226,15 @@ export const useStation = create<StationState>()(
               : ai,
           ),
         })),
-      applyLocal: ({ machine, platform, running, events }) =>
+      applyLocal: ({ machine, platform, running, models, modelNote, events }) =>
         set((state) => {
           const names = new Set(running.map((row) => row.name.trim().toLowerCase()).filter(Boolean));
+          const nextModels = models ?? state.datacenterModels;
+          const modelIds = new Set(
+            nextModels
+              .filter((model) => model.status === "in_use")
+              .map((model) => modelEventId(model)),
+          );
           const namedAis: NamedAi[] = state.namedAis.map((ai) => {
             if (names.has(ai.name.toLowerCase())) {
               return {
@@ -252,8 +266,10 @@ export const useStation = create<StationState>()(
             localSeated: true,
             localMachine: machine,
             localPlatform: platform,
+            datacenterModels: nextModels,
+            modelNote: modelNote === undefined ? state.modelNote : modelNote,
             namedAis,
-            events: mergeEvents(pruneStaleLive(state.events, names), events),
+            events: mergeEvents(pruneStaleLive(state.events, names, modelIds), events),
           };
         }),
       applyConductor: (feed) =>
@@ -282,6 +298,7 @@ export const useStation = create<StationState>()(
             localSeated: true,
             localMachine: feed.machine ?? state.localMachine,
             localPlatform: feed.platform ?? state.localPlatform,
+            datacenterModels: feed.models ?? state.datacenterModels,
             namedAis,
             events: mergeEvents(state.events, events),
           };
@@ -289,10 +306,15 @@ export const useStation = create<StationState>()(
       markLocalGone: () =>
         set((state) => ({
           localSeated: false,
+          datacenterModels: [],
+          modelNote: null,
           namedAis: state.namedAis.map((ai) =>
             ai.runningFrom === "local" ? { ...ai, running: false, runningFrom: undefined } : ai,
           ),
-          events: state.events.filter((event) => !event.id.startsWith("local-live-")),
+          events: state.events.filter(
+            (event) =>
+              !event.id.startsWith("local-live-") && !event.id.startsWith("local-model-"),
+          ),
         })),
       addKnown: (login) =>
         set((state) => {

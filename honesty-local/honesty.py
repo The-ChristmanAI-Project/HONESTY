@@ -6,7 +6,7 @@ The desk is 8788. Conductor hooks live here: /api/conductor, /api/conductor/seat
 /api/conductor/ingest, conductor-outbox.json. Never replace this file with a placeholder.
 """
 from __future__ import annotations
-import json, os, platform, re, subprocess, sys, threading, time, urllib.error, urllib.request, webbrowser
+import hashlib, hmac, json, os, platform, re, socket, subprocess, sys, threading, time, urllib.error, urllib.request, webbrowser
 from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -29,11 +29,27 @@ CATALOG = [
     ("Aider", ["aider"]), ("Continue", ["continue.dev", "continue"]), ("Perplexity", ["perplexity"]),
     ("Mistral", ["mistral"]), ("Codeium", ["codeium", "windsurf"]),
 ]
+DC_HOSTS = {
+    "api.anthropic.com": "Anthropic", "api.openai.com": "OpenAI", "api.x.ai": "xAI",
+    "integrate.api.nvidia.com": "NVIDIA", "inference.nvidia.com": "NVIDIA",
+    "ai.api.nvidia.com": "NVIDIA", "api.nvcf.nvidia.com": "NVIDIA",
+    "generativelanguage.googleapis.com": "Gemini", "api.mistral.ai": "Mistral",
+    "api.groq.com": "Groq", "openrouter.ai": "OpenRouter", "ollama.com": "Ollama",
+}
+REASONING_MARK = ("o1", "o3", "o4", "r1", "reason", "think", "nemotron", "opus", "sonnet",
+                  "grok-3", "grok-4", "grok-2", "gpt-5")
+FLAGSHIP_MARK = ("gpt-4o", "gpt-4.1", "gpt-5", "claude-3", "claude-sonnet", "claude-opus",
+                 "claude-haiku", "llama-3.1-405", "llama-3.3-70", "llama-4", "gemini-2",
+                 "mistral-large", "qwen2.5", "deepseek", "nemotron", "grok")
+NIM_PORTS = (8000, 8001, 9000, 1234)
+CLOUD_EVERY = 60
 lock = threading.Lock()
 state = {"armed": True, "started_at": datetime.now(timezone.utc).isoformat(), "platform": platform.system(),
          "machine": platform.node(), "running": [], "seen": [], "ledger": [], "last_scan": None,
-         "note": "Honesty Local reads this computer process list. Browser tabs are not programs.",
+         "models": [], "last_model_scan": None, "cloud_scan_at": 0.0, "model_note": None,
+         "note": "Honesty Local reads programs on this computer and which model is answering. Browser tabs are not programs.",
          "conductor_url": None, "conductor_last_push": None, "conductor_last_error": None}
+_dns_cache = {"at": 0.0, "ips": {}}
 
 def now_iso():
     return datetime.now(timezone.utc).isoformat()
@@ -53,6 +69,7 @@ def load_ledger():
         with lock:
             if isinstance(data.get("ledger"), list): state["ledger"] = data["ledger"][-400:]
             if isinstance(data.get("seen"), list): state["seen"] = data["seen"]
+            if isinstance(data.get("models"), list): state["models"] = data["models"]
     if HOOK.exists():
         try: hook = json.loads(HOOK.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError): hook = {}
@@ -63,7 +80,8 @@ def load_ledger():
 def save_ledger():
     with lock:
         payload = {"armed": state["armed"], "machine": state["machine"], "platform": state["platform"],
-                   "last_scan": state["last_scan"], "seen": state["seen"], "ledger": state["ledger"][-400:]}
+                   "last_scan": state["last_scan"], "seen": state["seen"], "ledger": state["ledger"][-400:],
+                   "models": state["models"]}
     tmp = LEDGER.with_suffix(".json.tmp"); tmp.write_text(json.dumps(payload, indent=2), encoding="utf-8"); tmp.replace(LEDGER)
 
 def save_hook(url):
@@ -102,6 +120,401 @@ def match_ai(proc):
                 return name
     return None
 
+def model_role(mid):
+    hay = (mid or "").lower()
+    return "reasoning" if any(mark in hay for mark in REASONING_MARK) else "chat"
+
+def keep_reachable(mid):
+    hay = (mid or "").lower()
+    return any(mark in hay for mark in REASONING_MARK + FLAGSHIP_MARK)
+
+def host_provider(host):
+    hay = (host or "").lower().split(":")[0]
+    if hay in DC_HOSTS: return DC_HOSTS[hay]
+    if "bedrock-runtime" in hay or hay.startswith("bedrock."): return "AWS"
+    for name, provider in DC_HOSTS.items():
+        if hay == name or hay.endswith("." + name): return provider
+    return None
+
+def http_json(url, headers=None, timeout=3):
+    hdrs = {"User-Agent": "Honesty-Local", **(headers or {})}
+    req = urllib.request.Request(url, headers=hdrs)
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as res:
+            raw = res.read(2_000_000)
+        data = json.loads(raw.decode("utf-8"))
+        return data if isinstance(data, (dict, list)) else None
+    except (urllib.error.URLError, TimeoutError, OSError, json.JSONDecodeError, UnicodeDecodeError, ValueError):
+        return None
+
+def model_row(mid, name, provider, where, status, source, host=None, via=None):
+    clean = str(mid or name or "").strip()
+    if not clean: return None
+    label = str(name or clean).strip()
+    return {"id": clean[:160], "name": label[:160], "provider": provider, "where": where,
+            "role": model_role(clean + " " + label), "status": status, "source": source,
+            "host": host, "via": via}
+
+def env_keys():
+    def first(*names):
+        for name in names:
+            val = os.environ.get(name)
+            if isinstance(val, str) and val.strip(): return val.strip()
+        return ""
+    return {
+        "nvidia": first("NVIDIA_API_KEY", "NGC_API_KEY", "NVAPI_KEY"),
+        "openai": first("OPENAI_API_KEY"),
+        "anthropic": first("ANTHROPIC_API_KEY", "CLAUDE_API_KEY"),
+        "ollama": first("OLLAMA_API_KEY"),
+        "xai": first("XAI_API_KEY"),
+        "awsAccessKeyId": first("AWS_ACCESS_KEY_ID"),
+        "awsSecretAccessKey": first("AWS_SECRET_ACCESS_KEY"),
+        "awsRegion": first("AWS_REGION", "AWS_DEFAULT_REGION") or "us-east-1",
+    }
+
+def resolve_dc_ips():
+    now = time.time()
+    if now - _dns_cache["at"] < 60 and _dns_cache["ips"]:
+        return _dns_cache["ips"]
+    ips = {}
+    hosts = list(DC_HOSTS) + ["bedrock-runtime.us-east-1.amazonaws.com", "bedrock-runtime.us-west-2.amazonaws.com"]
+    for host in hosts:
+        try:
+            for item in socket.getaddrinfo(host, 443, type=socket.SOCK_STREAM):
+                addr = item[4][0]
+                if addr: ips[addr] = host
+        except socket.gaierror:
+            continue
+    _dns_cache["at"] = now
+    _dns_cache["ips"] = ips
+    return ips
+
+def list_connections():
+    system = platform.system()
+    rows = []
+    try:
+        if system == "Windows":
+            raw = subprocess.check_output(["netstat", "-ano"], text=True, stderr=subprocess.DEVNULL,
+                                          creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+            for line in raw.splitlines():
+                if "ESTABLISHED" not in line.upper(): continue
+                parts = line.split()
+                if len(parts) < 5: continue
+                remote, pid = parts[2], parts[-1]
+                rows.append({"pid": pid, "remote": remote})
+            return rows
+        raw = subprocess.check_output(["lsof", "-nP", "-iTCP", "-sTCP:ESTABLISHED"], text=True,
+                                      stderr=subprocess.DEVNULL)
+        for line in raw.splitlines()[1:]:
+            parts = line.split()
+            if len(parts) < 9: continue
+            name = parts[-1]
+            if "->" not in name: continue
+            remote = name.split("->", 1)[1]
+            rows.append({"pid": parts[1], "name": parts[0], "remote": remote})
+        return rows
+    except (OSError, subprocess.CalledProcessError):
+        return []
+
+def probe_wire(pid_names):
+    ips = resolve_dc_ips()
+    found, seen = [], set()
+    for conn in list_connections():
+        remote = conn.get("remote") or ""
+        hostport = remote.rsplit(":", 1)[0].strip("[]")
+        host = ips.get(hostport) or hostport
+        provider = host_provider(host)
+        if not provider: continue
+        via = match_ai({"name": conn.get("name") or "", "cmd": conn.get("name") or ""})
+        if not via: via = pid_names.get(str(conn.get("pid") or ""))
+        key = (provider, host)
+        if key in seen: continue
+        seen.add(key)
+        row = model_row(f"{provider.lower()}-live", f"{provider} live session", provider,
+                        "datacenter", "in_use", "wire", host=host, via=via)
+        if row: found.append(row)
+    return found
+
+def probe_ollama():
+    hosts = ["http://127.0.0.1:11434"]
+    extra = os.environ.get("OLLAMA_HOST")
+    if extra and extra.startswith("http"): hosts.append(extra.rstrip("/"))
+    found = []
+    for base in hosts:
+        local = "127.0.0.1" in base or "localhost" in base
+        host = base.replace("http://", "").replace("https://", "")
+        ps = http_json(base + "/api/ps")
+        loaded = ps.get("models") if isinstance(ps, dict) else None
+        if isinstance(loaded, list):
+            for item in loaded:
+                if not isinstance(item, dict): continue
+                mid = str(item.get("model") or item.get("name") or "")
+                where = "datacenter" if ":cloud" in mid.lower() or not local else "local"
+                row = model_row(mid, mid, "Ollama", where, "in_use", "ollama-ps", host=host, via="Ollama")
+                if row: found.append(row)
+        tags = http_json(base + "/api/tags")
+        catalog = tags.get("models") if isinstance(tags, dict) else None
+        if not isinstance(catalog, list): continue
+        for item in catalog:
+            if not isinstance(item, dict): continue
+            mid = str(item.get("model") or item.get("name") or "")
+            cloud = ":cloud" in mid.lower()
+            if local and not cloud: continue
+            where = "datacenter" if cloud or not local else "local"
+            row = model_row(mid, mid, "Ollama", where, "configured", "ollama-tags", host=host, via="Ollama")
+            if row: found.append(row)
+    return found
+
+def probe_openai_compat_local():
+    found = []
+    for port in NIM_PORTS:
+        data = http_json(f"http://127.0.0.1:{port}/v1/models")
+        rows = data.get("data") if isinstance(data, dict) else None
+        if not isinstance(rows, list): continue
+        provider = "LM Studio" if port == 1234 else "NVIDIA NIM"
+        where = "local"
+        for item in rows:
+            if not isinstance(item, dict): continue
+            mid = str(item.get("id") or item.get("name") or "")
+            row = model_row(mid, mid, provider, where, "in_use", "nim-local",
+                            host=f"127.0.0.1:{port}", via=provider)
+            if row: found.append(row)
+    return found
+
+def read_json_file(path):
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError, UnicodeDecodeError):
+        return None
+
+def walk_models(obj, acc):
+    if isinstance(obj, dict):
+        for key, val in obj.items():
+            k = str(key).lower()
+            if k in ("model", "modelid", "model_id", "selectedmodel", "chatmodel", "aimodel") and isinstance(val, str) and val.strip():
+                acc.append(val.strip())
+            if k in ("selectedmodelbyrole",) and isinstance(val, dict):
+                for role, mid in val.items():
+                    if isinstance(mid, str) and mid.strip() and str(role).lower() in ("chat", "edit", "apply", "agent", "reason", "reasoning"):
+                        acc.append(mid.strip())
+            walk_models(val, acc)
+    elif isinstance(obj, list):
+        for item in obj: walk_models(item, acc)
+
+def read_selected_models():
+    home = Path.home()
+    paths = [
+        home / "Library/Application Support/Cursor/User/settings.json",
+        home / "Library/Application Support/Code/User/settings.json",
+        home / "AppData/Roaming/Cursor/User/settings.json",
+        home / "AppData/Roaming/Code/User/settings.json",
+        home / ".continue/config.json",
+        home / ".claude.json",
+        home / ".cursor/argv.json",
+    ]
+    found, seen = [], set()
+    for path in paths:
+        data = read_json_file(path)
+        if data is None: continue
+        names = []
+        walk_models(data, names)
+        via = "Cursor" if "Cursor" in str(path) else ("Continue" if "continue" in str(path).lower() else ("Claude" if "claude" in str(path).lower() else "config"))
+        for mid in names:
+            if mid.lower() in seen or len(mid) > 120: continue
+            seen.add(mid.lower())
+            provider = "Anthropic" if "claude" in mid.lower() else (
+                "OpenAI" if mid.lower().startswith(("gpt-", "o1", "o3", "o4")) else (
+                "xAI" if "grok" in mid.lower() else (
+                "NVIDIA" if "nvidia" in mid.lower() or "nemotron" in mid.lower() else (
+                "Ollama" if ":" in mid and "/" not in mid else "config"))))
+            row = model_row(mid, mid, provider, "datacenter" if provider != "Ollama" else "local",
+                            "configured", "config", via=via)
+            if row: found.append(row)
+    return found
+
+def aws_headers(method, url, region, service, access, secret, payload=b""):
+    parsed = urlparse(url)
+    host = parsed.netloc
+    now = datetime.now(timezone.utc)
+    amz_date = now.strftime("%Y%m%dT%H%M%SZ")
+    datestamp = now.strftime("%Y%m%d")
+    payload_hash = hashlib.sha256(payload).hexdigest()
+    canonical_headers = f"host:{host}\nx-amz-date:{amz_date}\n"
+    signed_headers = "host;x-amz-date"
+    canonical_request = f"{method}\n{parsed.path or '/'}\n{parsed.query}\n{canonical_headers}\n{signed_headers}\n{payload_hash}"
+    scope = f"{datestamp}/{region}/{service}/aws4_request"
+    string_to_sign = f"AWS4-HMAC-SHA256\n{amz_date}\n{scope}\n{hashlib.sha256(canonical_request.encode()).hexdigest()}"
+    def sign(key, msg): return hmac.new(key, msg.encode("utf-8"), hashlib.sha256).digest()
+    k_date = sign(("AWS4" + secret).encode("utf-8"), datestamp)
+    k_region = hmac.new(k_date, region.encode(), hashlib.sha256).digest()
+    k_service = hmac.new(k_region, service.encode(), hashlib.sha256).digest()
+    k_signing = hmac.new(k_service, b"aws4_request", hashlib.sha256).digest()
+    signature = hmac.new(k_signing, string_to_sign.encode(), hashlib.sha256).hexdigest()
+    auth = f"AWS4-HMAC-SHA256 Credential={access}/{scope}, SignedHeaders={signed_headers}, Signature={signature}"
+    return {"Authorization": auth, "X-Amz-Date": amz_date, "Host": host}
+
+def probe_cloud(keys):
+    found, notes = [], []
+    bag = threading.Lock()
+
+    def take(rows, note):
+        with bag:
+            found.extend(rows)
+            if note: notes.append(note)
+
+    def from_list(items, provider, source, host, id_key="id", name_key=None, filter_ids=True):
+        out, kept = [], 0
+        if not isinstance(items, list):
+            return out, 0
+        for item in items:
+            if not isinstance(item, dict): continue
+            mid = str(item.get(id_key) or item.get("name") or item.get("model") or "")
+            if filter_ids and not keep_reachable(mid): continue
+            label = str(item.get(name_key) or mid) if name_key else mid
+            row = model_row(mid, label, provider, "datacenter", "reachable", source, host=host)
+            if row:
+                out.append(row); kept += 1
+            if kept >= 8: break
+        return out, len(items)
+
+    def nvidia():
+        token = keys.get("nvidia") or ""
+        if not token: return
+        data = http_json("https://integrate.api.nvidia.com/v1/models",
+                         {"Authorization": f"Bearer {token}"}, timeout=4)
+        rows, total = from_list(data.get("data") if isinstance(data, dict) else None,
+                                "NVIDIA", "nvidia-catalog", "integrate.api.nvidia.com")
+        take(rows, f"NVIDIA catalog {total} models." if total else "NVIDIA key seated. Catalog did not answer.")
+
+    def openai():
+        token = keys.get("openai") or ""
+        if not token: return
+        data = http_json("https://api.openai.com/v1/models",
+                         {"Authorization": f"Bearer {token}"}, timeout=4)
+        rows, total = from_list(data.get("data") if isinstance(data, dict) else None,
+                                "OpenAI", "openai-catalog", "api.openai.com")
+        take(rows, f"OpenAI catalog {total} models." if total else "OpenAI key seated. Catalog did not answer.")
+
+    def anthropic():
+        token = keys.get("anthropic") or ""
+        if not token: return
+        data = http_json("https://api.anthropic.com/v1/models",
+                         {"x-api-key": token, "anthropic-version": "2023-06-01"}, timeout=4)
+        rows, total = from_list(data.get("data") if isinstance(data, dict) else None,
+                                "Anthropic", "anthropic-catalog", "api.anthropic.com",
+                                name_key="display_name", filter_ids=False)
+        take(rows, f"Anthropic catalog {total} models." if total else "Anthropic key seated. Catalog did not answer.")
+
+    def xai():
+        token = keys.get("xai") or ""
+        if not token: return
+        data = http_json("https://api.x.ai/v1/models",
+                         {"Authorization": f"Bearer {token}"}, timeout=4)
+        rows, total = from_list(data.get("data") if isinstance(data, dict) else None,
+                                "xAI", "xai-catalog", "api.x.ai", filter_ids=False)
+        take(rows, f"xAI catalog {total} models." if total else "xAI key seated. Catalog did not answer.")
+
+    def ollama_cloud():
+        token = keys.get("ollama") or ""
+        if not token: return
+        data = http_json("https://ollama.com/api/tags",
+                         {"Authorization": f"Bearer {token}"}, timeout=4)
+        rows, total = from_list(data.get("models") if isinstance(data, dict) else None,
+                                "Ollama", "ollama-cloud", "ollama.com", filter_ids=False)
+        take(rows, f"Ollama cloud {total} models." if total else None)
+
+    def bedrock():
+        access, secret = keys.get("awsAccessKeyId") or "", keys.get("awsSecretAccessKey") or ""
+        region = keys.get("awsRegion") or "us-east-1"
+        if not (access and secret): return
+        url = f"https://bedrock.{region}.amazonaws.com/foundation-models"
+        try:
+            hdrs = aws_headers("GET", url, region, "bedrock", access, secret)
+            data = http_json(url, hdrs, timeout=5)
+        except (ValueError, OSError):
+            data = None
+        rows, total = from_list(data.get("modelSummaries") if isinstance(data, dict) else None,
+                                "AWS", "bedrock-catalog", f"bedrock.{region}.amazonaws.com",
+                                id_key="modelId", name_key="modelName")
+        take(rows, f"Bedrock catalog {total} models." if total else "AWS keys seated. Bedrock catalog did not answer.")
+
+    workers = [threading.Thread(target=fn, daemon=True) for fn in (nvidia, openai, anthropic, xai, ollama_cloud, bedrock)]
+    for worker in workers: worker.start()
+    for worker in workers: worker.join(timeout=6)
+    return found, notes
+
+def merge_models(rows):
+    rank = {"in_use": 3, "configured": 2, "reachable": 1}
+    by_key, by_provider = {}, {}
+    for row in rows:
+        if not row: continue
+        key = (row["provider"].lower(), row["id"].lower())
+        prior = by_key.get(key)
+        if not prior or rank.get(row["status"], 0) > rank.get(prior["status"], 0):
+            by_key[key] = row
+        by_provider.setdefault(row["provider"].lower(), []).append(row)
+    # A live wire to a provider + a named model for that provider means that model is in use.
+    for provider, items in by_provider.items():
+        live = [m for m in items if m["status"] == "in_use" and m["source"] == "wire"]
+        named = [m for m in items if m.get("status") == "configured" and not str(m["id"]).endswith("-live")]
+        if not live or not named: continue
+        named.sort(key=lambda m: (0 if m["role"] == "reasoning" else 1))
+        chosen = named[0]
+        chosen = {**chosen, "status": "in_use", "source": "wire+config",
+                  "host": live[0].get("host") or chosen.get("host"),
+                  "via": live[0].get("via") or chosen.get("via"),
+                  "where": "datacenter"}
+        by_key[(chosen["provider"].lower(), chosen["id"].lower())] = chosen
+        for ghost in live:
+            by_key.pop((ghost["provider"].lower(), ghost["id"].lower()), None)
+    out = list(by_key.values())
+    out.sort(key=lambda m: (-rank.get(m["status"], 0), 0 if m["role"] == "reasoning" else 1, m["provider"], m["name"]))
+    return out[:40]
+
+def scan_models(keys=None, force_cloud=False, pid_names=None):
+    found = []
+    found.extend(probe_ollama())
+    found.extend(probe_openai_compat_local())
+    found.extend(probe_wire(pid_names or {}))
+    found.extend(read_selected_models())
+    notes = []
+    now = time.time()
+    with lock: last_cloud = state["cloud_scan_at"]
+    use_keys = keys if keys else env_keys()
+    has_keys = any(use_keys.get(k) for k in ("nvidia", "openai", "anthropic", "ollama", "xai")) or (
+        use_keys.get("awsAccessKeyId") and use_keys.get("awsSecretAccessKey"))
+    if has_keys and (force_cloud or keys or now - last_cloud >= CLOUD_EVERY):
+        cloud, notes = probe_cloud(use_keys)
+        found.extend(cloud)
+        with lock: state["cloud_scan_at"] = now
+    merged = merge_models(found)
+    at = now_iso()
+    with lock:
+        prior = {(m.get("provider"), m.get("id"), m.get("status")) for m in state["models"]}
+        now_set = {(m.get("provider"), m.get("id"), m.get("status")) for m in merged}
+        if state["armed"]:
+            for item in merged:
+                key = (item.get("provider"), item.get("id"), item.get("status"))
+                if key in prior: continue
+                if item.get("status") != "in_use": continue
+                where = "at the datacenter" if item.get("where") == "datacenter" else "on this computer"
+                via = f" via {item['via']}" if item.get("via") else ""
+                state["ledger"].append({
+                    "at": at, "kind": "model", "name": item["provider"],
+                    "summary": f"{item['name']} is the {item['role']} model {where}{via}",
+                })
+            for provider, mid, status in sorted(prior - now_set):
+                if status != "in_use": continue
+                state["ledger"].append({
+                    "at": at, "kind": "model", "name": provider,
+                    "summary": f"{mid} is no longer the live {provider} model",
+                })
+        state["models"] = merged
+        state["last_model_scan"] = at
+        state["model_note"] = " ".join(notes) if notes else None
+        state["ledger"] = state["ledger"][-400:]
+    return merged
+
 def scan_once():
     procs = list_processes(); found = {}
     for proc in procs:
@@ -127,9 +540,17 @@ def scan_once():
             for name in sorted(prior - now_names):
                 state["ledger"].append({"at": at, "kind": "stop", "name": name, "summary": f"{name} is no longer in the process list"})
         state["running"] = running; state["last_scan"] = at; state["ledger"] = state["ledger"][-400:]
+        pid_names = {}
+        for item in running:
+            for pid in item.get("pids") or []:
+                pid_names[str(pid)] = item["name"]
+    scan_models(pid_names=pid_names)
+    with lock:
         snap = {"armed": state["armed"], "platform": state["platform"], "machine": state["machine"],
                 "running": list(state["running"]), "seen": list(state["seen"]), "ledger": list(state["ledger"][-80:]),
-                "last_scan": state["last_scan"], "note": state["note"], "process_count": len(procs)}
+                "models": list(state["models"]), "last_model_scan": state["last_model_scan"],
+                "model_note": state["model_note"], "last_scan": state["last_scan"], "note": state["note"],
+                "process_count": len(procs)}
     save_ledger(); write_outbox(); push_to_conductor(); return snap
 
 def private_roster(skip):
@@ -208,14 +629,37 @@ def conductor_snapshot(include_private=True):
         if include_private:
             skip = {name.lower() for name, _ in CATALOG}
             beings.extend(private_roster(skip))
+        models = list(state["models"])
+        live_models = [m for m in models if m.get("status") == "in_use"]
+        for item in live_models:
+            mid = str(item.get("id") or item.get("name") or "model")
+            where = "at the datacenter" if item.get("where") == "datacenter" else "on this computer"
+            via = f" via {item['via']}" if item.get("via") else ""
+            beings.append({
+                "id": "model-" + re.sub(r"[^a-z0-9]+", "-", f"{item.get('provider','')}-{mid}".lower()).strip("-"),
+                "name": item.get("name") or mid, "title": f"{item.get('provider')} {item.get('role', 'chat')} model",
+                "division": "Datacenter" if item.get("where") == "datacenter" else "Honesty Local",
+                "wing": "Honesty", "focus": f"{item.get('role', 'chat')} model {where}.",
+                "mandate": f"{item.get('name')} is the {item.get('role', 'chat')} model {where}{via}.",
+                "domain": "Ops", "shipped": 1, "emptyStreak": 0, "status": "clean", "queued": 0, "artifacts": 1,
+                "confidence": 1.0, "verified": True, "hoursAgo": 0, "minutes": 0, "tokens": 0, "nextIn": 0,
+                "pids": [], "lastAt": state["last_model_scan"], "private": False,
+            })
+        live_bits = [f"{m.get('name')} ({m.get('provider')})" for m in live_models]
+        standing = f"{len(running)} named program(s) running on {state['machine']}."
+        if live_bits:
+            standing += " Reasoning model: " + "; ".join(live_bits) + "."
+        else:
+            standing += " No datacenter model in use right now."
+        standing += " Browser tabs are not programs."
         return {"source": "honesty-local", "version": 1, "seated": True, "wing": "Honesty",
                 "hook": state["conductor_url"], "armed": state["armed"], "platform": state["platform"],
                 "machine": state["machine"], "last_scan": state["last_scan"],
                 "conductor_url": state["conductor_url"], "conductor_last_push": state["conductor_last_push"],
                 "conductor_last_error": state["conductor_last_error"], "running": list(state["running"]),
-                "seen": list(state["seen"]), "ledger": list(state["ledger"][-80:]), "beings": beings,
-                "note": state["note"],
-                "standing": f"{len(running)} named program(s) running on {state['machine']}. Browser tabs are not programs."}
+                "seen": list(state["seen"]), "models": models, "ledger": list(state["ledger"][-80:]),
+                "beings": beings, "note": state["note"], "model_note": state["model_note"],
+                "standing": standing}
 
 def write_outbox():
     tmp = OUTBOX.with_suffix(".json.tmp"); tmp.write_text(json.dumps(conductor_snapshot(), indent=2), encoding="utf-8"); tmp.replace(OUTBOX)
@@ -238,13 +682,22 @@ def report_text(snap):
     if not running: lines.append("  None of the named AI desktop programs are in the process list.")
     else:
         for item in running: lines.append(f"  {item['name']} · {item['count']} process · pids {', '.join(item['pids'])}")
+    lines += ["", "MODELS"]
+    models = snap.get("models") or []
+    if not models: lines.append("  No loaded local model and no datacenter model detected.")
+    else:
+        for item in models:
+            where = "datacenter" if item.get("where") == "datacenter" else "this computer"
+            via = f" via {item['via']}" if item.get("via") else ""
+            lines.append(f"  {item.get('name')} · {item.get('provider')} · {item.get('status')} · {item.get('role')} · {where}{via}")
+    if snap.get("model_note"): lines += ["", snap["model_note"]]
     return "\n".join(lines) + "\n"
 
 PAGE = """<!DOCTYPE html><html><head><meta charset=\"utf-8\"/><title>Honesty Local</title>
 <style>body{margin:0;background:#0e0d0b;color:#efece4;font:16px/1.5 system-ui} .w{max-width:960px;margin:0 auto;padding:28px 20px} a{color:#8a9188}</style></head>
 <body><div class=\"w\"><p>Honesty Local</p><h1>Above all else.</h1>
-<p>Process list on this computer. A browser tab is not Claude.</p>
-<p><a href=\"/conductor\">Conductor rail</a> · <a href=\"/api/status\">status</a> · <a href=\"/api/report.txt\">report</a></p>
+<p>Programs on this computer. Which model is answering. A browser tab is not Claude.</p>
+<p><a href=\"/conductor\">Conductor rail</a> · <a href=\"/api/status\">status</a> · <a href=\"/api/models\">models</a> · <a href=\"/api/report.txt\">report</a></p>
 <pre id=\"out\">loading</pre></div>
 <script>async function go(){const d=await (await fetch(\"/api/status\")).json();document.getElementById(\"out\").textContent=JSON.stringify(d,null,2);}go();setInterval(go,8000);</script></body></html>"""
 
@@ -289,7 +742,12 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/status":
             with lock: self._json({"armed": state["armed"], "platform": state["platform"], "machine": state["machine"],
                                   "running": list(state["running"]), "seen": list(state["seen"]),
+                                  "models": list(state["models"]), "model_note": state["model_note"],
+                                  "last_model_scan": state["last_model_scan"],
                                   "ledger": list(state["ledger"][-80:]), "last_scan": state["last_scan"], "note": state["note"]}); return
+        if path == "/api/models":
+            with lock: self._json({"models": list(state["models"]), "note": state["model_note"],
+                                  "last_scan": state["last_model_scan"], "machine": state["machine"]}); return
         if path == "/api/conductor": self._json(conductor_snapshot()); return
         if path == "/api/report.txt":
             with lock: self._send(200, report_text(dict(state)).encode("utf-8"), "text/plain; charset=utf-8"); return
@@ -303,6 +761,30 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/arm":
             with lock: state["armed"] = bool(body.get("armed", True)); self._json(scan_once()); return
         if path == "/api/scan": self._json(scan_once()); return
+        if path == "/api/models/probe":
+            keys = {
+                "nvidia": str(body.get("nvidia") or "").strip(),
+                "openai": str(body.get("openai") or "").strip(),
+                "anthropic": str(body.get("anthropic") or "").strip(),
+                "ollama": str(body.get("ollama") or "").strip(),
+                "xai": str(body.get("xai") or "").strip(),
+                "awsAccessKeyId": str(body.get("awsAccessKeyId") or "").strip(),
+                "awsSecretAccessKey": str(body.get("awsSecretAccessKey") or "").strip(),
+                "awsRegion": str(body.get("awsRegion") or "").strip() or "us-east-1",
+            }
+            merged_keys = env_keys()
+            for key, val in keys.items():
+                if val: merged_keys[key] = val
+            with lock:
+                pid_names = {}
+                for item in state["running"]:
+                    for pid in item.get("pids") or []:
+                        pid_names[str(pid)] = item["name"]
+            models = scan_models(keys=merged_keys, force_cloud=True, pid_names=pid_names)
+            with lock:
+                self._json({"ok": True, "models": list(state["models"]) if models is not None else models,
+                            "note": state["model_note"], "last_scan": state["last_model_scan"]})
+            return
         if path == "/api/conductor/seat":
             url = body.get("url"); clean = url.strip() if isinstance(url, str) else ""
             if clean and not clean.startswith("http"): self._json({"ok": False, "error": "Hook has to start with http."}, 400); return
@@ -327,7 +809,36 @@ def loop():
             except Exception as exc: sys.stderr.write(f"[honesty] scan failed: {exc}\n")
         time.sleep(8)
 
+def self_test():
+    assert host_provider("api.anthropic.com") == "Anthropic"
+    assert host_provider("api.openai.com") == "OpenAI"
+    assert host_provider("integrate.api.nvidia.com") == "NVIDIA"
+    assert host_provider("bedrock-runtime.us-east-1.amazonaws.com") == "AWS"
+    assert host_provider("chrome.google.com") is None
+    assert model_role("o3-mini") == "reasoning"
+    assert model_role("claude-sonnet-4-5") == "reasoning"
+    assert model_role("meta/llama-3.1-nemotron-70b-instruct") == "reasoning"
+    assert model_role("whisper-1") == "chat"
+    assert keep_reachable("gpt-4o")
+    merged = merge_models([
+        model_row("anthropic-live", "Anthropic live session", "Anthropic", "datacenter", "in_use", "wire",
+                  host="api.anthropic.com", via="Cursor"),
+        model_row("claude-sonnet-4-5", "claude-sonnet-4-5", "Anthropic", "datacenter", "configured", "config",
+                  via="Cursor"),
+        model_row("whisper-1", "whisper-1", "OpenAI", "datacenter", "reachable", "openai-catalog",
+                  host="api.openai.com"),
+    ])
+    names = [m["id"] for m in merged]
+    assert "claude-sonnet-4-5" in names
+    chosen = next(m for m in merged if m["id"] == "claude-sonnet-4-5")
+    assert chosen["status"] == "in_use"
+    assert chosen["source"] == "wire+config"
+    assert "anthropic-live" not in names
+    sys.stdout.write("honesty-local self-test ok\n")
+    return 0
+
 def main():
+    if "--self-test" in sys.argv: return self_test()
     load_ledger(); snap = scan_once()
     if "--once" in sys.argv: sys.stdout.write(report_text(snap)); return 0
     threading.Thread(target=loop, daemon=True).start()

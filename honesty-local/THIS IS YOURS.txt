@@ -2,8 +2,9 @@ HONESTY LOCAL
 above all else
 
 This program runs on the home station. It is not a website.
-It reads the process list on THIS computer and stays on any
-named AI desktop program that is running.
+It reads the programs on THIS computer and which model is
+answering. It stays on any named AI desktop program that
+is running.
 
 Mac: double-click "Start Honesty.command"
 Windows: double-click "Start Honesty.bat"

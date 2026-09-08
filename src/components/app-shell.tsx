@@ -15,7 +15,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { Intro, introAlreadyPlayed } from "@/components/intro";
 import { DESK_BIND, LOCAL_BIND } from "@/lib/conductor";
 import { canPickFolder, hasFolder, scanFolder } from "@/lib/folder-watch";
-import { pullLocal } from "@/lib/local-agent";
+import { pullDatacenterIfKeyed, pullLocal } from "@/lib/local-agent";
 import { pullTheRecord, pullTheWire } from "@/lib/pull";
 import { useStation } from "@/lib/store";
 import { cn } from "@/lib/utils";
@@ -23,7 +23,7 @@ import { cn } from "@/lib/utils";
 const NAV = [
   { to: "/", label: "Desk", icon: Home },
   { to: "/ledger", label: "Ledger", icon: FileText },
-  { to: "/wire", label: "Wire", icon: MessageSquare },
+  { to: "/wire", label: "Mail & calls", icon: MessageSquare },
   { to: "/systems", label: "AIs", icon: Radar },
   { to: "/conductor", label: "Conductor", icon: Radio },
   { to: "/keys", label: "Keys", icon: KeyRound },
@@ -74,7 +74,13 @@ export function AppShell({ children }: { children: ReactNode }) {
     const id = window.setInterval(() => {
       void pullLocal();
     }, 8000);
-    return () => window.clearInterval(id);
+    const models = window.setInterval(() => {
+      void pullDatacenterIfKeyed();
+    }, 60000);
+    return () => {
+      window.clearInterval(id);
+      window.clearInterval(models);
+    };
   }, [hydrated]);
 
   useEffect(() => {

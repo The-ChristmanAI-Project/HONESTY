@@ -254,8 +254,9 @@ function ConductorPage() {
               {standing}
             </p>
             <p className="mt-3 max-w-[74ch] text-sm leading-relaxed text-cd-mute">
-              Honesty reports to this board. Named programs on this computer. Not a kernel.
-              Not a clearance stamp. Not someone else’s machine.
+              Honesty reports to this board. Named programs on this computer, and which
+              model is answering. Not a kernel. Not a clearance stamp. Not someone else’s
+              machine.
             </p>
           </section>
 

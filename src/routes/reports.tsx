@@ -19,11 +19,12 @@ function ReportsPage() {
   const known = useStation((s) => s.knownActors);
   const namedAis = useStation((s) => s.namedAis);
   const armed = useStation((s) => s.armed);
+  const models = useStation((s) => s.datacenterModels);
   const [openId, setOpenId] = useState<string | null>(reports[0]?.id ?? null);
   const open = reports.find((report) => report.id === openId) ?? reports[0] ?? null;
 
   function generate() {
-    const report = buildReport(events, settings, known, namedAis, armed);
+    const report = buildReport(events, settings, known, namedAis, armed, models);
     useStation.getState().addReport(report);
     setOpenId(report.id);
     toast("Report kept.");

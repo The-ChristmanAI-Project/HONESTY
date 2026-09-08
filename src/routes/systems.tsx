@@ -8,7 +8,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Panel } from "@/components/ui/panel";
 import { deriveAiSystems, trailFor } from "@/lib/ai-scan";
+import { fromTheirComputers, modelPlainLine, statusLabel } from "@/lib/datacenter";
 import { SOURCE_LABEL } from "@/lib/github";
+import { probeDatacenter } from "@/lib/local-agent";
 import { pullTheRecord, pullTheWire } from "@/lib/pull";
 import { useStation } from "@/lib/store";
 import { relTime } from "@/lib/time";
@@ -23,9 +25,14 @@ function SystemsPage() {
   const settings = useStation((s) => s.settings);
   const known = useStation((s) => s.knownActors);
   const pulling = useStation((s) => s.pulling);
+  const localSeated = useStation((s) => s.localSeated);
+  const models = useStation((s) => s.datacenterModels);
+  const theirModels = fromTheirComputers(models);
+  const modelNote = useStation((s) => s.modelNote);
   const [selected, setSelected] = useState<string | null>(null);
   const [name, setName] = useState("");
   const [aliases, setAliases] = useState("");
+  const [probing, setProbing] = useState(false);
 
   const systems = useMemo(
     () => deriveAiSystems(events, namedAis, armed),
@@ -44,7 +51,7 @@ function SystemsPage() {
     );
     toast(
       `Scan complete. ${next.length} AI system${next.length === 1 ? "" : "s"} in the record. ${
-        useStation.getState().armed ? "Following each." : "Arm the watch to follow."
+        useStation.getState().armed ? "Following each." : "Turn watching on to follow."
       }`,
     );
   }
@@ -56,29 +63,82 @@ function SystemsPage() {
     useStation.getState().addAi(clean, aliases);
     setName("");
     setAliases("");
-    toast(`${clean} named. ${armed ? "Tracker started." : "Arm the watch to follow it."}`);
+    toast(`${clean} named. ${armed ? "Following it." : "Turn watching on to follow it."}`);
   }
 
   return (
     <div className="mx-auto max-w-5xl">
       <PageHeader
-        kicker="AI systems"
-        title="Scan, then follow."
+        kicker="AIs"
+        title="On your computer, or theirs."
         actions={
           <>
             <Button variant="secondary" onClick={() => void scan()} disabled={pulling}>
-              {pulling ? "Scanning" : "Scan now"}
+              {pulling ? "Looking" : "Look now"}
             </Button>
             <Badge tone={armed ? "sage" : "muted"}>
-              {armed ? `${tracking.length} tracking` : "At rest"}
+              {armed ? `${tracking.length} watching` : "Off"}
             </Badge>
             <Badge>{systems.length} systems</Badge>
           </>
         }
       >
-        Honesty Local reads named AI programs on this computer. Arm the watch to follow each
-        name through GitHub, mail, and the wire.
+        Programs on this computer are one thing. The model answering from Anthropic, NVIDIA,
+        or OpenAI is another. People you don't know are a third thing — they live on People.
       </PageHeader>
+
+      <Panel className="mt-6">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h2 className="text-xl">From their computers</h2>
+            <p className="mt-1 text-sm text-muted">
+              {localSeated
+                ? "The company's machine doing the thinking. Claude the app is on your computer. claude-opus is on Anthropic's computers."
+                : "Start Honesty Local. A browser tab cannot see their computers."}
+            </p>
+          </div>
+          <Button
+            variant="secondary"
+            disabled={!localSeated || probing}
+            onClick={() => {
+              setProbing(true);
+              void probeDatacenter().then((ok) => {
+                setProbing(false);
+                toast(
+                  ok
+                    ? `Read ${useStation.getState().datacenterModels.length} model${
+                        useStation.getState().datacenterModels.length === 1 ? "" : "s"
+                      }.`
+                    : "Honesty Local did not answer.",
+                );
+              });
+            }}
+          >
+            {probing ? "Looking" : "See which model"}
+          </Button>
+        </div>
+        <ul className="mt-4 space-y-3">
+          {theirModels.map((model) => (
+            <li key={`${model.provider}-${model.id}-${model.source}`} className="min-w-0">
+              <div className="flex items-center justify-between gap-2">
+                <p className="truncate font-medium">{model.name}</p>
+                <Badge tone={model.status === "in_use" ? "sage" : "muted"}>
+                  {statusLabel(model)}
+                </Badge>
+              </div>
+              <p className="mt-1 font-mono text-xs text-subtle">{modelPlainLine(model)}</p>
+            </li>
+          ))}
+          {theirModels.length === 0 ? (
+            <li className="text-sm text-muted">
+              {localSeated
+                ? "No model picked and none answering right now."
+                : "Honesty Local is quiet."}
+            </li>
+          ) : null}
+        </ul>
+        {modelNote ? <p className="mt-3 font-mono text-xs text-subtle">{modelNote}</p> : null}
+      </Panel>
 
       <Panel className="mt-6">
         <form onSubmit={nameAi} className="flex flex-col gap-3 sm:flex-row sm:items-end">
@@ -106,7 +166,7 @@ function SystemsPage() {
 
       <div className="mt-6 grid items-start gap-6 lg:grid-cols-3">
         <Panel>
-          <h2 className="text-xl">Trackers</h2>
+          <h2 className="text-xl">AIs you're watching</h2>
           <ul className="mt-4 space-y-2">
             {systems.map((system) => (
               <li key={system.id}>
@@ -124,12 +184,12 @@ function SystemsPage() {
                       {system.running
                         ? "on this computer"
                         : system.tracking
-                          ? "following"
-                          : "at rest"}
+                          ? "watching"
+                          : "off"}
                     </Badge>
                   </div>
                   <p className="mt-1 font-mono text-xs text-subtle">
-                    {system.eventCount} · {system.origin}
+                    {system.eventCount} time{system.eventCount === 1 ? "" : "s"}
                     {system.lastAt ? ` · ${relTime(system.lastAt)}` : " · not seen yet"}
                   </p>
                 </button>
@@ -152,7 +212,7 @@ function SystemsPage() {
                       ? "On this computer now. Honesty Local has it in the process list."
                       : current.tracking
                         ? "Tracker live. Process list, GitHub, mail, and wire hits attach here."
-                        : "Named. Arm the watch to follow it through the record."}
+                        : "Named. Turn watching on to follow it."}
                   </p>
                 </div>
                 {namedAis.some((ai) => ai.id === current.id) ? (
@@ -188,8 +248,8 @@ function SystemsPage() {
                   current.running
                     ? "On this computer. Pull the desk if the live line is missing."
                     : current.tracking
-                      ? "No movement yet. Following the process list, GitHub, mail, and the wire."
-                      : "No movement in the record. Arm the watch to follow."
+                      ? "No movement yet. Following the process list, GitHub, mail, and calls."
+                      : "No movement in the record. Turn watching on to follow."
                 }
               />
             </>

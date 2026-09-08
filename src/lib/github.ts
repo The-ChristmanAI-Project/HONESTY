@@ -337,7 +337,7 @@ export const SOURCE_LABEL: Record<AccessEvent["source"], string> = {
   home: "Home",
   local: "Local",
   mail: "Mail",
-  wire: "Wire",
+  wire: "Recorded",
   calendar: "Calendar",
   outlook: "Outlook",
   teams: "Teams",

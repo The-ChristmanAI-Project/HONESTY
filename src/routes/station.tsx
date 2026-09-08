@@ -84,7 +84,7 @@ function StationPage() {
 
   return (
     <div className="mx-auto max-w-3xl">
-      <PageHeader kicker="Station" title="How the watch is seated.">
+      <PageHeader kicker="Station" title="How this desk is set up.">
         GitHub is pulled live. A personal token is optional and never leaves this browser except
         toward api.github.com. Without it, only the public record is visible.
       </PageHeader>
@@ -94,10 +94,11 @@ function StationPage() {
         <p className="mt-2 text-sm text-muted">
           This desk is yours with no subscription. GitHub public events pull without a token.
           Optional GitHub token stays in this browser. Mail, calendar, Outlook, and Teams load
-          only if already seated in Grok — optional, never required. Calls, SMS, iMessage,
-          Signal, and WhatsApp are recorded by hand. Arm Honesty to scan GitHub, mail, the wire,
+          only if already connected in Grok — optional, never required. Calls, SMS, iMessage,
+          Signal, and WhatsApp are recorded by hand. Start watching to scan GitHub, mail, calls,
           and named AIs — then follow each in the record. Honesty Local reads the process list
-          for named AI desktop programs. Kernel file-opens and phone taps are not claimed.
+          for named AI desktop programs and which model is answering. Kernel file-opens
+          and phone taps are not claimed.
         </p>
       </Panel>
 

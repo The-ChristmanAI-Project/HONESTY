@@ -2,7 +2,7 @@ import { format } from "date-fns";
 import { deriveAiSystems, isAiLogin, isOutsideEvent, isOutsidePerson } from "./ai-scan";
 import { deriveChannels, counterpartOf } from "./comms";
 import { deriveActors, deriveFiles, isComms, isTrustedActor, KIND_LABEL, SOURCE_LABEL } from "./github";
-import type { AccessEvent, HonestyReport, NamedAi, StationSettings } from "./types";
+import type { AccessEvent, DatacenterModel, HonestyReport, NamedAi, StationSettings } from "./types";
 
 function stamp(iso: string): string {
   try {
@@ -18,6 +18,7 @@ export function buildReport(
   knownActors: string[],
   namedAis: NamedAi[] = [],
   armed = false,
+  models: DatacenterModel[] = [],
 ): HonestyReport {
   const createdAt = new Date().toISOString();
   const actors = deriveActors(events);
@@ -47,6 +48,7 @@ export function buildReport(
     `  Files / targets: ${files.length}`,
     `  Actors: ${actors.length}`,
     `  AI systems: ${systems.length}`,
+    `  Datacenter models: ${models.length}`,
     `  Outside actors: ${outside.length}`,
     "",
     "CHANNELS",
@@ -70,6 +72,19 @@ export function buildReport(
         `  ${system.name} (${system.origin}${seat}) — ${system.eventCount} hits${
           system.lastAt ? ` · last ${stamp(system.lastAt)}` : ""
         }`,
+      );
+    }
+  }
+
+  lines.push("", "DATACENTER");
+  if (models.length === 0) {
+    lines.push("  None detected. Honesty Local reads which model is answering.");
+  } else {
+    for (const model of models) {
+      const where = model.where === "datacenter" ? "datacenter" : "this computer";
+      const via = model.via ? ` via ${model.via}` : "";
+      lines.push(
+        `  ${model.name} (${model.provider}, ${model.status}, ${model.role}, ${where}${via})`,
       );
     }
   }
