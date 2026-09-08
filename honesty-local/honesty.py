@@ -366,11 +366,12 @@ def walk_models(obj, acc, stamps=None, skip_keys=None):
                 mid = val.strip()
                 if mid.lower() in ("true", "false") or len(mid) >= 80:
                     continue
-                if parent_at is not None and not is_current(parent_at):
-                    continue
                 acc.append(mid)
                 if parent_at is not None:
-                    stamps[mid.lower()] = stamp_iso(parent_at)
+                    iso = stamp_iso(parent_at)
+                    prev = stamps.get(mid.lower())
+                    if not prev or (parse_stamp(iso) or 0) >= (parse_stamp(prev) or 0):
+                        stamps[mid.lower()] = iso
             if k in ("selectedmodelbyrole",) and isinstance(val, dict):
                 for role, mid in val.items():
                     if isinstance(mid, str) and mid.strip() and str(role).lower() in ("chat", "edit", "apply", "agent", "reason", "reasoning"):
@@ -391,7 +392,8 @@ def read_selected_models(running=None):
         home / ".claude.json",
         home / ".cursor/argv.json",
     ]
-    found, seen = [], set()
+    found = []
+    best = {}  # via -> (ts, mid, provider, at)
     for path in paths:
         data = read_json_file(path)
         if data is None: continue
@@ -400,21 +402,22 @@ def read_selected_models(running=None):
         via = "Cursor" if "Cursor" in str(path) else ("Continue" if "continue" in str(path).lower() else ("Claude" if "claude" in str(path).lower() else "config"))
         if via.lower() not in running and via != "config":
             continue
-        claude_file = "claude" in str(path).lower()
         for mid in names:
-            if mid.lower() in seen or len(mid) > 120: continue
+            if len(mid) > 120: continue
             at = stamps.get(mid.lower())
-            if claude_file and not is_current(at):
-                continue
-            seen.add(mid.lower())
+            ts = parse_stamp(at) or 0
             provider = "Anthropic" if "claude" in mid.lower() else (
                 "OpenAI" if mid.lower().startswith(("gpt-", "o1", "o3", "o4")) else (
                 "xAI" if "grok" in mid.lower() else (
                 "NVIDIA" if "nvidia" in mid.lower() or "nemotron" in mid.lower() else (
                 "Ollama" if ":" in mid and "/" not in mid else "config"))))
-            row = model_row(mid, mid, provider, "datacenter" if provider != "Ollama" else "local",
-                            "configured", "config", via=via, at=at)
-            if row: found.append(row)
+            prev = best.get(via)
+            if not prev or ts >= prev[0]:
+                best[via] = (ts, mid, provider, at)
+    for via, (ts, mid, provider, at) in best.items():
+        row = model_row(mid, mid, provider, "datacenter" if provider != "Ollama" else "local",
+                        "configured", "config", via=via, at=at)
+        if row: found.append(row)
     found.extend(read_recent_sessions())
     return found
 
@@ -579,20 +582,26 @@ def merge_models(rows):
         if not prior or rank.get(row["status"], 0) > rank.get(prior["status"], 0):
             by_key[key] = row
         by_provider.setdefault(row["provider"].lower(), []).append(row)
-    # A live wire + a *current* named pick for that provider. Never a leftover slot.
+    # Live wire keeps the newest named instance for that app, even if the stamp
+    # is older than CURRENT_HOURS. Leftover configured rows still drop.
     for provider, items in by_provider.items():
         live = [m for m in items if m["status"] == "in_use" and m["source"] == "wire"]
-        named = [m for m in items if m.get("status") == "configured" and not str(m["id"]).endswith("-live")
-                 and is_current(m.get("at"))]
+        named = [m for m in items if m.get("status") == "configured" and not str(m["id"]).endswith("-live")]
         if not live or not named: continue
-        named.sort(key=lambda m: (0 if m["role"] == "reasoning" else 1))
-        chosen = named[0]
-        chosen = {**chosen, "status": "in_use", "source": "wire+config",
-                  "host": live[0].get("host") or chosen.get("host"),
-                  "via": live[0].get("via") or chosen.get("via"),
-                  "where": "datacenter", "at": now_iso()}
-        by_key[(chosen["provider"].lower(), chosen["id"].lower())] = chosen
+        used = set()
         for ghost in live:
+            via = (ghost.get("via") or "").lower()
+            candidates = [m for m in named if (m.get("via") or "").lower() == via] if via else []
+            if not candidates:
+                candidates = [m for m in named if id(m) not in used] or named
+            candidates.sort(key=lambda m: (-(parse_stamp(m.get("at")) or 0), 0 if m["role"] == "reasoning" else 1))
+            pick = candidates[0]
+            used.add(id(pick))
+            chosen = {**pick, "status": "in_use", "source": "wire+config",
+                      "host": ghost.get("host") or pick.get("host"),
+                      "via": ghost.get("via") or pick.get("via"),
+                      "where": "datacenter", "at": now_iso()}
+            by_key[(chosen["provider"].lower(), chosen["id"].lower())] = chosen
             by_key.pop((ghost["provider"].lower(), ghost["id"].lower()), None)
     out = list(by_key.values())
     out = [m for m in out if m.get("status") != "configured" or is_current(m.get("at"))]
@@ -1003,23 +1012,35 @@ def self_test():
                   via="Claude", at=stale_at),
     ])
     leftover_ids = [m["id"] for m in leftover]
-    assert "anthropic-live" in leftover_ids
-    assert "claude-fable-5" not in leftover_ids
-    assert leftover[0]["status"] == "in_use"
-    names = []
+    assert "claude-fable-5" in leftover_ids
+    assert "anthropic-live" not in leftover_ids
+    named_live = next(m for m in leftover if m["id"] == "claude-fable-5")
+    assert named_live["status"] == "in_use"
+    assert named_live["source"] == "wire+config"
+    assert named_live["via"] == "Claude"
+    orphan = merge_models([
+        model_row("claude-fable-5", "claude-fable-5", "Anthropic", "datacenter", "configured", "config",
+                  via="Claude", at=stale_at),
+    ])
+    assert "claude-fable-5" not in [m["id"] for m in orphan]
+    names, stamps = [], {}
+    old_ms = int((time.time() - 8 * 3600) * 1000)
+    now_ms = int(time.time() * 1000)
     walk_models({
         "cachedGrowthBookFeatures": {"model": "claude-opus-4-7"},
         "lastModelUsage": {"claude-fable-5": {"inputTokens": 1}},
         "projects": {"/Users/EverettN/BROCKSTON": {"lastModelUsage": {"claude-fable-5": {}}}},
         "clientDataCacheSlots": {
-            "old": {"model": "claude-fable-5-1", "at": int((time.time() - 8 * 3600) * 1000)},
-            "now": {"model": "claude-sonnet-4-5", "at": int(time.time() * 1000)},
+            "old": {"model": "claude-fable-5-1", "at": old_ms},
+            "later": {"model": "claude-fable-5-1", "at": now_ms},
+            "now": {"model": "claude-sonnet-4-5", "at": now_ms},
         },
-    }, names)
+    }, names, stamps)
     assert "claude-opus-4-7" not in names
     assert "claude-fable-5" not in names
-    assert "claude-fable-5-1" not in names
+    assert "claude-fable-5-1" in names
     assert "claude-sonnet-4-5" in names
+    assert abs((parse_stamp(stamps["claude-fable-5-1"]) or 0) - now_ms / 1000) < 2
     assert is_current(now)
     assert not is_current(stale_at)
     sys.stdout.write("honesty-local self-test ok\n")
