@@ -149,6 +149,7 @@ def match_ai(proc):
         for alias in [name.lower(), *aliases]:
             if alias and alias in hay:
                 if browser and alias == "continue": continue
+                if alias == "grok" and "grok_seat" in hay: continue
                 return name
     return None
 
@@ -910,6 +911,8 @@ def self_test():
     assert host_provider("integrate.api.nvidia.com") == "NVIDIA"
     assert host_provider("bedrock-runtime.us-east-1.amazonaws.com") == "AWS"
     assert host_provider("chrome.google.com") is None
+    assert match_ai({"name": "grok", "cmd": "grok"}) == "Grok"
+    assert match_ai({"name": "python3", "cmd": "python3 /Users/EverettN/mcp-media-ingestor/grok_seat.py"}) is None
     assert model_role("o3-mini") == "reasoning"
     assert model_role("claude-sonnet-4-5") == "reasoning"
     assert model_role("meta/llama-3.1-nemotron-70b-instruct") == "reasoning"
