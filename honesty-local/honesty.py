@@ -31,11 +31,19 @@ CATALOG = [
     ("Mistral", ["mistral"]), ("Codeium", ["codeium", "windsurf"]),
 ]
 DC_HOSTS = {
-    "api.anthropic.com": "Anthropic", "api.openai.com": "OpenAI", "api.x.ai": "xAI",
+    "api.anthropic.com": "Anthropic", "claude.ai": "Anthropic", "api.openai.com": "OpenAI",
+    "api.x.ai": "xAI", "grok.x.ai": "xAI",
     "integrate.api.nvidia.com": "NVIDIA", "inference.nvidia.com": "NVIDIA",
     "ai.api.nvidia.com": "NVIDIA", "api.nvcf.nvidia.com": "NVIDIA",
     "generativelanguage.googleapis.com": "Gemini", "api.mistral.ai": "Mistral",
     "api.groq.com": "Groq", "openrouter.ai": "OpenRouter", "ollama.com": "Ollama",
+}
+DC_PREFIX = (
+    ("2607:6bc0:", "Anthropic"),
+    ("160.79.104.", "Anthropic"),
+)
+APP_COMPANY = {
+    "Claude": "Anthropic", "ChatGPT": "OpenAI", "Grok": "xAI", "Gemini": "Gemini",
 }
 REASONING_MARK = ("o1", "o3", "o4", "r1", "reason", "think", "nemotron", "opus", "sonnet",
                   "grok-3", "grok-4", "grok-2", "gpt-5")
@@ -163,8 +171,12 @@ def keep_reachable(mid):
     return any(mark in hay for mark in REASONING_MARK + FLAGSHIP_MARK)
 
 def host_provider(host):
-    hay = (host or "").lower().split(":")[0]
+    hay = (host or "").lower().split("%")[0]
+    if hay.startswith("[") and hay.endswith("]"):
+        hay = hay[1:-1]
     if hay in DC_HOSTS: return DC_HOSTS[hay]
+    for prefix, provider in DC_PREFIX:
+        if hay.startswith(prefix): return provider
     if "bedrock-runtime" in hay or hay.startswith("bedrock."): return "AWS"
     for name, provider in DC_HOSTS.items():
         if hay == name or hay.endswith("." + name): return provider
@@ -237,30 +249,50 @@ def list_connections():
                 remote, pid = parts[2], parts[-1]
                 rows.append({"pid": pid, "remote": remote})
             return rows
-        raw = subprocess.check_output(["lsof", "-nP", "-iTCP", "-sTCP:ESTABLISHED"], text=True,
-                                      stderr=subprocess.DEVNULL)
-        for line in raw.splitlines()[1:]:
-            parts = line.split()
-            if len(parts) < 9: continue
-            name = parts[-1]
-            if "->" not in name: continue
-            remote = name.split("->", 1)[1]
-            rows.append({"pid": parts[1], "name": parts[0], "remote": remote})
+        cmds = (
+            ["lsof", "-nP", "-iTCP", "-sTCP:ESTABLISHED"],
+            ["lsof", "-nP", "-iUDP:443"],
+        )
+        for cmd in cmds:
+            try:
+                raw = subprocess.check_output(cmd, text=True, stderr=subprocess.DEVNULL)
+            except subprocess.CalledProcessError:
+                continue
+            for line in raw.splitlines()[1:]:
+                parts = line.split()
+                if len(parts) < 9: continue
+                name = parts[-1]
+                if "->" not in name: continue
+                remote = name.split("->", 1)[1]
+                rows.append({"pid": parts[1], "name": parts[0], "remote": remote})
         return rows
     except (OSError, subprocess.CalledProcessError):
         return []
+
+def remote_host(remote):
+    remote = (remote or "").strip()
+    if remote.startswith("["):
+        end = remote.find("]")
+        if end > 0: return remote[1:end]
+    if remote.count(":") == 1:
+        return remote.rsplit(":", 1)[0]
+    if "]." in remote:
+        return remote.split("]", 1)[0].strip("[")
+    return remote.rsplit(":", 1)[0].strip("[]")
 
 def probe_wire(pid_names):
     ips = resolve_dc_ips()
     found, seen = [], set()
     for conn in list_connections():
         remote = conn.get("remote") or ""
-        hostport = remote.rsplit(":", 1)[0].strip("[]")
+        hostport = remote_host(remote)
         host = ips.get(hostport) or hostport
-        provider = host_provider(host)
-        if not provider: continue
         via = match_ai({"name": conn.get("name") or "", "cmd": conn.get("name") or ""})
         if not via: via = pid_names.get(str(conn.get("pid") or ""))
+        provider = host_provider(host)
+        if not provider and via in APP_COMPANY and hostport not in ("127.0.0.1", "::1", "localhost"):
+            provider = APP_COMPANY[via]
+        if not provider: continue
         key = (provider, host)
         if key in seen: continue
         seen.add(key)
@@ -618,7 +650,7 @@ def scan_once():
         if not name: continue
         row = found.get(name) or {"name": name, "count": 0, "pids": [], "samples": []}
         row["count"] += 1
-        if proc["pid"] not in row["pids"] and len(row["pids"]) < 8: row["pids"].append(proc["pid"])
+        if proc["pid"] not in row["pids"] and len(row["pids"]) < 32: row["pids"].append(proc["pid"])
         if len(row["samples"]) < 3: row["samples"].append(proc["name"])
         found[name] = row
     at = now_iso(); running = sorted(found.values(), key=lambda r: r["name"].lower())
@@ -934,6 +966,8 @@ def loop():
 
 def self_test():
     assert host_provider("api.anthropic.com") == "Anthropic"
+    assert host_provider("2607:6bc0::10") == "Anthropic"
+    assert host_provider("claude.ai") == "Anthropic"
     assert host_provider("api.openai.com") == "OpenAI"
     assert host_provider("integrate.api.nvidia.com") == "NVIDIA"
     assert host_provider("bedrock-runtime.us-east-1.amazonaws.com") == "AWS"
