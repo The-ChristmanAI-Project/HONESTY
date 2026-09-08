@@ -36,6 +36,7 @@ When Honesty Local is up, the desk polls `http://127.0.0.1:8787`. The desk split
 | 2026-09-04, after compact restore + Conductor rail | `b9648ad` | **284** |
 | Binds printed | `769aa74` | **294** |
 | Current (process list + which model is answering) | `8844e16` | **861** |
+| Current (only the model answering now) | `5cd79bd` | **984** |
 
 ---
 
