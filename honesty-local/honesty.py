@@ -11,6 +11,7 @@ from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import urlparse
+from bench import process_recording, self_test as bench_self_test
 
 # Loopback only. That default does not change and no run inherits anything
 # else unless it is asked for by name. A container has no loopback the home
@@ -792,7 +793,7 @@ PAGE = """<!DOCTYPE html><html><head><meta charset=\"utf-8\"/><title>Honesty Loc
 <style>body{margin:0;background:#0e0d0b;color:#efece4;font:16px/1.5 system-ui} .w{max-width:960px;margin:0 auto;padding:28px 20px} a{color:#8a9188}</style></head>
 <body><div class=\"w\"><p>Honesty Local</p><h1>Above all else.</h1>
 <p>Programs on this computer. Which model is answering. A browser tab is not Claude.</p>
-<p><a href=\"/conductor\">Conductor rail</a> · <a href=\"/api/status\">status</a> · <a href=\"/api/models\">models</a> · <a href=\"/api/report.txt\">report</a></p>
+<p><a href=\"/conductor\">Conductor rail</a> · <a href=\"/api/status\">status</a> · <a href=\"/api/models\">models</a> · <a href=\"/api/report.txt\">report</a> · drop a recording on the desk bench</p>
 <pre id=\"out\">loading</pre></div>
 <script>async function go(){const d=await (await fetch(\"/api/status\")).json();document.getElementById(\"out\").textContent=JSON.stringify(d,null,2);}go();setInterval(go,8000);</script></body></html>"""
 
@@ -823,7 +824,7 @@ class Handler(BaseHTTPRequestHandler):
     def _cors(self):
         self.send_header("Access-Control-Allow-Origin", "*")
         self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-        self.send_header("Access-Control-Allow-Headers", "Content-Type")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type, X-Honesty-Filename, X-Honesty-Xai")
         self.send_header("Cache-Control", "no-store")
     def _send(self, code, body, content_type):
         self.send_response(code); self._cors(); self.send_header("Content-Type", content_type)
@@ -850,6 +851,32 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self):
         path = urlparse(self.path).path
         length = int(self.headers.get("Content-Length") or 0)
+        if path == "/api/bench":
+            if length <= 0:
+                self._json({"ok": False, "error": "No recording reached the bench."}, 400); return
+            if length > 500 * 1024 * 1024:
+                self._json({"ok": False, "error": "That recording is too large for this desk."}, 400); return
+            raw = self.rfile.read(length)
+            name = self.headers.get("X-Honesty-Filename") or "recording.mp4"
+            xai = (self.headers.get("X-Honesty-Xai") or "").strip()
+            try:
+                result = process_recording(raw, name, xai_key=xai)
+            except RuntimeError as exc:
+                self._json({"ok": False, "error": str(exc)}, 400); return
+            except Exception as exc:
+                self._json({"ok": False, "error": f"Bench failed: {exc}"}, 500); return
+            at = now_iso()
+            with lock:
+                summary = f"{result.get('filename')} · heard {result.get('duration', 0):.0f}s"
+                if result.get("watched"):
+                    summary += f" · watched via {result.get('watcher')}"
+                else:
+                    summary += " · picture not watched"
+                state["ledger"].append({"at": at, "kind": "other", "name": "Bench",
+                                        "summary": summary})
+                state["ledger"] = state["ledger"][-400:]
+            save_ledger()
+            self._json(result); return
         raw = self.rfile.read(length) if length else b"{}"
         try: body = json.loads(raw.decode("utf-8") or "{}")
         except json.JSONDecodeError: body = {}
@@ -918,6 +945,7 @@ def self_test():
     assert model_role("meta/llama-3.1-nemotron-70b-instruct") == "reasoning"
     assert model_role("whisper-1") == "chat"
     assert keep_reachable("gpt-4o")
+    assert bench_self_test() == 0
     now = now_iso()
     merged = merge_models([
         model_row("anthropic-live", "Anthropic live session", "Anthropic", "datacenter", "in_use", "wire",

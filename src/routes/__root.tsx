@@ -14,7 +14,7 @@ function NotFoundPage() {
       <h1 className="mt-3 font-display text-3xl tracking-tight">This desk has no such room.</h1>
       <p className="mt-3 text-sm text-muted">
         Honesty is open source from The Christman AI Project. The page you opened is not on the
-        board. Desk, Ledger, Wire, AIs, People, Reports, Station, and Conductor are.
+        board. Desk, Bench, Ledger, Wire, AIs, People, Reports, Station, and Conductor are.
       </p>
       <p className="mt-6">
         <Link to="/" className="text-accent underline underline-offset-4">

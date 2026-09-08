@@ -208,6 +208,7 @@ function KeyCard({
   const [ollama, setOllama] = useState("");
   const [openai, setOpenai] = useState("");
   const [anthropic, setAnthropic] = useState("");
+  const [xai, setXai] = useState("");
   const [awsId, setAwsId] = useState("");
   const [awsSecret, setAwsSecret] = useState("");
   const [awsRegion, setAwsRegion] = useState(vault.awsRegion);
@@ -219,6 +220,7 @@ function KeyCard({
     if (id === "ollama" && ollama.trim()) next.ollama = ollama.trim();
     if (id === "openai" && openai.trim()) next.openai = openai.trim();
     if (id === "anthropic" && anthropic.trim()) next.anthropic = anthropic.trim();
+    if (id === "xai" && xai.trim()) next.xai = xai.trim();
     if (id === "aws") {
       if (awsId.trim()) next.awsAccessKeyId = awsId.trim();
       if (awsSecret.trim()) next.awsSecretAccessKey = awsSecret.trim();
@@ -229,6 +231,7 @@ function KeyCard({
     setOllama("");
     setOpenai("");
     setAnthropic("");
+    setXai("");
     setAwsId("");
     setAwsSecret("");
   }
@@ -239,6 +242,7 @@ function KeyCard({
     if (id === "ollama") next.ollama = "";
     if (id === "openai") next.openai = "";
     if (id === "anthropic") next.anthropic = "";
+    if (id === "xai") next.xai = "";
     if (id === "aws") {
       next.awsAccessKeyId = "";
       next.awsSecretAccessKey = "";
@@ -304,6 +308,16 @@ function KeyCard({
             onChange={(e) => setAnthropic(e.target.value)}
             placeholder={seated ? "Replace Anthropic key" : "Anthropic key"}
             aria-label="Anthropic key"
+          />
+        ) : null}
+        {id === "xai" ? (
+          <Input
+            type="password"
+            autoComplete="off"
+            value={xai}
+            onChange={(e) => setXai(e.target.value)}
+            placeholder={seated ? "Replace xAI key" : "xAI key"}
+            aria-label="xAI key"
           />
         ) : null}
         {id === "aws" ? (

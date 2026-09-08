@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as BenchRouteImport } from './routes/bench'
 import { Route as ConductorRouteImport } from './routes/conductor'
 import { Route as KeysRouteImport } from './routes/keys'
 import { Route as LedgerRouteImport } from './routes/ledger'
@@ -22,6 +23,11 @@ import { Route as WireRouteImport } from './routes/wire'
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const BenchRoute = BenchRouteImport.update({
+  id: '/bench',
+  path: '/bench',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ConductorRoute = ConductorRouteImport.update({
@@ -67,6 +73,7 @@ const WireRoute = WireRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/bench': typeof BenchRoute
   '/conductor': typeof ConductorRoute
   '/keys': typeof KeysRoute
   '/ledger': typeof LedgerRoute
@@ -78,6 +85,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/bench': typeof BenchRoute
   '/conductor': typeof ConductorRoute
   '/keys': typeof KeysRoute
   '/ledger': typeof LedgerRoute
@@ -90,6 +98,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/bench': typeof BenchRoute
   '/conductor': typeof ConductorRoute
   '/keys': typeof KeysRoute
   '/ledger': typeof LedgerRoute
@@ -103,6 +112,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/bench'
     | '/conductor'
     | '/keys'
     | '/ledger'
@@ -114,6 +124,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/bench'
     | '/conductor'
     | '/keys'
     | '/ledger'
@@ -125,6 +136,7 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/bench'
     | '/conductor'
     | '/keys'
     | '/ledger'
@@ -137,6 +149,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  BenchRoute: typeof BenchRoute
   ConductorRoute: typeof ConductorRoute
   KeysRoute: typeof KeysRoute
   LedgerRoute: typeof LedgerRoute
@@ -154,6 +167,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/bench': {
+      id: '/bench'
+      path: '/bench'
+      fullPath: '/bench'
+      preLoaderRoute: typeof BenchRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/conductor': {
@@ -217,6 +237,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  BenchRoute: BenchRoute,
   ConductorRoute: ConductorRoute,
   KeysRoute: KeysRoute,
   LedgerRoute: LedgerRoute,

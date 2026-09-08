@@ -1,6 +1,7 @@
 import { Link, useRouterState } from "@tanstack/react-router";
 import {
   Ellipsis,
+  Clapperboard,
   FileText,
   Home,
   KeyRound,
@@ -26,14 +27,15 @@ const NAV = [
   { to: "/wire", label: "Mail & calls", icon: MessageSquare },
   { to: "/systems", label: "AIs", icon: Radar },
   { to: "/conductor", label: "Conductor", icon: Radio },
+  { to: "/bench", label: "Bench", icon: Clapperboard },
   { to: "/keys", label: "Keys", icon: KeyRound },
   { to: "/people", label: "People", icon: Users },
   { to: "/reports", label: "Reports", icon: ScrollText },
   { to: "/station", label: "Station", icon: Settings2 },
 ] as const;
 
-const MOBILE_PRIMARY = ["/", "/wire", "/conductor", "/keys"] as const;
-const MOBILE_MORE = ["/ledger", "/systems", "/people", "/reports", "/station"] as const;
+const MOBILE_PRIMARY = ["/", "/bench", "/conductor", "/keys"] as const;
+const MOBILE_MORE = ["/wire", "/ledger", "/systems", "/people", "/reports", "/station"] as const;
 
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });

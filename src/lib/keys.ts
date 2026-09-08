@@ -1,12 +1,13 @@
 const STORAGE = "honesty.keys.v1";
 
-export type KeySlotId = "nvidia" | "ollama" | "aws" | "openai" | "anthropic";
+export type KeySlotId = "nvidia" | "ollama" | "aws" | "openai" | "anthropic" | "xai";
 
 export type KeyVault = {
   nvidia: string;
   ollama: string;
   openai: string;
   anthropic: string;
+  xai: string;
   awsAccessKeyId: string;
   awsSecretAccessKey: string;
   awsRegion: string;
@@ -17,6 +18,7 @@ export const EMPTY_VAULT: KeyVault = {
   ollama: "",
   openai: "",
   anthropic: "",
+  xai: "",
   awsAccessKeyId: "",
   awsSecretAccessKey: "",
   awsRegion: "",
@@ -32,6 +34,7 @@ export const KEY_SLOTS: {
   { id: "aws", label: "AWS", hint: "access key, secret, region" },
   { id: "openai", label: "OpenAI", hint: "OPENAI_API_KEY" },
   { id: "anthropic", label: "Anthropic", hint: "ANTHROPIC_API_KEY" },
+  { id: "xai", label: "xAI", hint: "XAI_API_KEY — so the bench can watch the picture" },
 ];
 
 const ALIASES: Record<string, keyof KeyVault> = {
@@ -46,6 +49,9 @@ const ALIASES: Record<string, keyof KeyVault> = {
   ANTHROPIC_API_KEY: "anthropic",
   ANTHROPIC_KEY: "anthropic",
   CLAUDE_API_KEY: "anthropic",
+  XAI_API_KEY: "xai",
+  GROK_API_KEY: "xai",
+  XAI_KEY: "xai",
   AWS_ACCESS_KEY_ID: "awsAccessKeyId",
   AWS_SECRET_ACCESS_KEY: "awsSecretAccessKey",
   AWS_REGION: "awsRegion",
@@ -67,6 +73,7 @@ export function readVault(): KeyVault {
       ollama: typeof parsed.ollama === "string" ? parsed.ollama : "",
       openai: typeof parsed.openai === "string" ? parsed.openai : "",
       anthropic: typeof parsed.anthropic === "string" ? parsed.anthropic : "",
+      xai: typeof parsed.xai === "string" ? parsed.xai : "",
       awsAccessKeyId: typeof parsed.awsAccessKeyId === "string" ? parsed.awsAccessKeyId : "",
       awsSecretAccessKey:
         typeof parsed.awsSecretAccessKey === "string" ? parsed.awsSecretAccessKey : "",
@@ -115,6 +122,7 @@ function guessBare(vault: KeyVault, value: string) {
   const clean = value.trim();
   if (!clean || clean.includes("\n") || clean.includes("=")) return;
   if (clean.startsWith("sk-ant-")) vault.anthropic = clean;
+  else if (clean.startsWith("xai-")) vault.xai = clean;
   else if (clean.startsWith("sk-")) vault.openai = clean;
   else if (/^AKIA[0-9A-Z]{16}$/i.test(clean)) vault.awsAccessKeyId = clean;
   else if (/^nvapi-/i.test(clean) || /^nvdev-/i.test(clean)) vault.nvidia = clean;
