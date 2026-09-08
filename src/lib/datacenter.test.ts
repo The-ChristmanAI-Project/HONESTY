@@ -2,6 +2,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import {
   companyComputers,
+  currentFromTheirComputers,
   fromTheirComputers,
   liveModels,
   probeBody,
@@ -44,6 +45,7 @@ describe("datacenter model watch", () => {
     assert.equal(statusLabel(sonnet), "answering now");
     assert.equal(statusLabel(catalog), "available");
     assert.equal(fromTheirComputers(models).length, 2);
+    assert.equal(currentFromTheirComputers(models).length, 1);
     assert.equal(companyComputers("Anthropic"), "Anthropic's computers");
     assert.equal(companyComputers("Ollama"), "Ollama's cloud");
   });
@@ -78,7 +80,36 @@ describe("datacenter model watch", () => {
       events.some((event) => event.id === "local-model-anthropic-claude-sonnet-4-5"),
       true,
     );
-    assert.match(events.find((event) => event.id.startsWith("local-model-"))?.summary ?? "", /answering now/);
+    const modelLine = events.find((event) => event.id.startsWith("local-model-"));
+    assert.match(modelLine?.summary ?? "", /answering now/);
+    assert.equal(modelLine?.source, "datacenter");
+    assert.equal(modelLine?.counterpart, "claude-sonnet-4-5");
+  });
+
+  it("does not put a leftover pick on the live ledger", () => {
+    const snap: LocalSnapshot = {
+      armed: true,
+      platform: "Darwin",
+      machine: "Everett.lan",
+      last_scan: "2026-09-07T06:10:00.000Z",
+      running: [{ name: "Claude", count: 1, pids: ["1"] }],
+      models: [
+        {
+          ...sonnet,
+          id: "claude-fable-5",
+          name: "claude-fable-5",
+          status: "configured",
+          source: "config",
+          via: "Claude",
+        },
+      ],
+      ledger: [],
+    };
+    const events = eventsFromLocal(snap);
+    assert.equal(
+      events.some((event) => event.id.startsWith("local-model-")),
+      false,
+    );
   });
 
   it("drops the live model line when it stops answering", () => {

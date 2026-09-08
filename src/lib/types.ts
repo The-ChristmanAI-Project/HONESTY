@@ -2,6 +2,7 @@ export type EventSource =
   | "github"
   | "home"
   | "local"
+  | "datacenter"
   | "mail"
   | "wire"
   | "calendar"

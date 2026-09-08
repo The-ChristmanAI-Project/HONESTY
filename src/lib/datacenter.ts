@@ -6,6 +6,14 @@ export function liveModels(models: Model[]): Model[] {
   return models.filter((model) => model.status === "in_use");
 }
 
+export function currentFromTheirComputers(models: Model[]): Model[] {
+  return liveModels(fromTheirComputers(models));
+}
+
+export function currentOnYourComputer(models: Model[]): Model[] {
+  return liveModels(onYourComputerModels(models));
+}
+
 export function reasoningNow(models: Model[]): Model | null {
   const live = liveModels(models);
   return live.find((model) => model.role === "reasoning") ?? live[0] ?? null;

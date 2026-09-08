@@ -27,6 +27,7 @@ export function EventFeed({
       {events.map((event) => {
         const trusted =
           event.source === "local" ||
+          event.source === "datacenter" ||
           event.source === "home" ||
           isTrustedActor(event.actorLogin, owner, known);
         const ai = isAi?.(event);

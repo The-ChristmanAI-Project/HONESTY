@@ -43,6 +43,16 @@ FLAGSHIP_MARK = ("gpt-4o", "gpt-4.1", "gpt-5", "claude-3", "claude-sonnet", "cla
                  "mistral-large", "qwen2.5", "deepseek", "nemotron", "grok")
 NIM_PORTS = (8000, 8001, 9000, 1234)
 CLOUD_EVERY = 60
+CURRENT_HOURS = 2.0
+SKIP_MODEL_KEYS = {
+    "cachedgrowthbookfeatures", "cachedgrowthbook", "cachedexperimentfeatures",
+    "cachedexperimentdata", "tengu_auto_mode_config",
+    "tengu_tool_search_unsupported_models", "lastmodelusage",
+    "additionalmodeloptionscache", "additionalmodelcostscache",
+    "additionalmodeloptionsansweredat", "modelaccesscache",
+    "orgmodeldefaultcache", "metricsstatuscache", "groveconfigcache",
+    "autocompactwindowscache", "projects",
+}
 lock = threading.Lock()
 state = {"armed": True, "started_at": datetime.now(timezone.utc).isoformat(), "platform": platform.system(),
          "machine": platform.node(), "running": [], "seen": [], "ledger": [], "last_scan": None,
@@ -62,6 +72,29 @@ def hours_ago(iso):
     except ValueError:
         return 0.0
 
+def parse_stamp(val):
+    if val is None: return None
+    if isinstance(val, (int, float)):
+        ts = float(val)
+        if ts > 1e12: ts /= 1000.0
+        return ts if ts > 1e9 else None
+    if isinstance(val, str) and val.strip():
+        try:
+            return datetime.fromisoformat(val.strip().replace("Z", "+00:00")).timestamp()
+        except ValueError:
+            return None
+    return None
+
+def stamp_iso(val):
+    ts = parse_stamp(val)
+    if ts is None: return None
+    return datetime.fromtimestamp(ts, timezone.utc).isoformat()
+
+def is_current(val, hours=CURRENT_HOURS):
+    ts = parse_stamp(val)
+    if ts is None: return False
+    return (time.time() - ts) / 3600.0 <= hours
+
 def load_ledger():
     if LEDGER.exists():
         try: data = json.loads(LEDGER.read_text(encoding="utf-8"))
@@ -69,7 +102,6 @@ def load_ledger():
         with lock:
             if isinstance(data.get("ledger"), list): state["ledger"] = data["ledger"][-400:]
             if isinstance(data.get("seen"), list): state["seen"] = data["seen"]
-            if isinstance(data.get("models"), list): state["models"] = data["models"]
     if HOOK.exists():
         try: hook = json.loads(HOOK.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError): hook = {}
@@ -147,13 +179,13 @@ def http_json(url, headers=None, timeout=3):
     except (urllib.error.URLError, TimeoutError, OSError, json.JSONDecodeError, UnicodeDecodeError, ValueError):
         return None
 
-def model_row(mid, name, provider, where, status, source, host=None, via=None):
+def model_row(mid, name, provider, where, status, source, host=None, via=None, at=None):
     clean = str(mid or name or "").strip()
     if not clean: return None
     label = str(name or clean).strip()
     return {"id": clean[:160], "name": label[:160], "provider": provider, "where": where,
             "role": model_role(clean + " " + label), "status": status, "source": source,
-            "host": host, "via": via}
+            "host": host, "via": via, "at": at or now_iso()}
 
 def env_keys():
     def first(*names):
@@ -231,7 +263,7 @@ def probe_wire(pid_names):
         if key in seen: continue
         seen.add(key)
         row = model_row(f"{provider.lower()}-live", f"{provider} live session", provider,
-                        "datacenter", "in_use", "wire", host=host, via=via)
+                        "datacenter", "in_use", "wire", host=host, via=via, at=now_iso())
         if row: found.append(row)
     return found
 
@@ -250,7 +282,7 @@ def probe_ollama():
                 if not isinstance(item, dict): continue
                 mid = str(item.get("model") or item.get("name") or "")
                 where = "datacenter" if ":cloud" in mid.lower() or not local else "local"
-                row = model_row(mid, mid, "Ollama", where, "in_use", "ollama-ps", host=host, via="Ollama")
+                row = model_row(mid, mid, "Ollama", where, "in_use", "ollama-ps", host=host, via="Ollama", at=now_iso())
                 if row: found.append(row)
         tags = http_json(base + "/api/tags")
         catalog = tags.get("models") if isinstance(tags, dict) else None
@@ -261,7 +293,7 @@ def probe_ollama():
             cloud = ":cloud" in mid.lower()
             if local and not cloud: continue
             where = "datacenter" if cloud or not local else "local"
-            row = model_row(mid, mid, "Ollama", where, "configured", "ollama-tags", host=host, via="Ollama")
+            row = model_row(mid, mid, "Ollama", where, "reachable", "ollama-tags", host=host, via="Ollama")
             if row: found.append(row)
     return found
 
@@ -277,7 +309,7 @@ def probe_openai_compat_local():
             if not isinstance(item, dict): continue
             mid = str(item.get("id") or item.get("name") or "")
             row = model_row(mid, mid, provider, where, "in_use", "nim-local",
-                            host=f"127.0.0.1:{port}", via=provider)
+                            host=f"127.0.0.1:{port}", via=provider, at=now_iso())
             if row: found.append(row)
     return found
 
@@ -287,21 +319,34 @@ def read_json_file(path):
     except (OSError, json.JSONDecodeError, UnicodeDecodeError):
         return None
 
-def walk_models(obj, acc):
+def walk_models(obj, acc, stamps=None, skip_keys=None):
+    skip_keys = skip_keys or SKIP_MODEL_KEYS
+    stamps = stamps if stamps is not None else {}
     if isinstance(obj, dict):
+        parent_at = obj.get("at") or obj.get("timestamp") or obj.get("lastStartTime")
         for key, val in obj.items():
             k = str(key).lower()
+            if k in skip_keys:
+                continue
             if k in ("model", "modelid", "model_id", "selectedmodel", "chatmodel", "aimodel") and isinstance(val, str) and val.strip():
-                acc.append(val.strip())
+                mid = val.strip()
+                if mid.lower() in ("true", "false") or len(mid) >= 80:
+                    continue
+                if parent_at is not None and not is_current(parent_at):
+                    continue
+                acc.append(mid)
+                if parent_at is not None:
+                    stamps[mid.lower()] = stamp_iso(parent_at)
             if k in ("selectedmodelbyrole",) and isinstance(val, dict):
                 for role, mid in val.items():
                     if isinstance(mid, str) and mid.strip() and str(role).lower() in ("chat", "edit", "apply", "agent", "reason", "reasoning"):
                         acc.append(mid.strip())
-            walk_models(val, acc)
+            walk_models(val, acc, stamps, skip_keys)
     elif isinstance(obj, list):
-        for item in obj: walk_models(item, acc)
+        for item in obj: walk_models(item, acc, stamps, skip_keys)
 
-def read_selected_models():
+def read_selected_models(running=None):
+    running = {str(n).lower() for n in (running or [])}
     home = Path.home()
     paths = [
         home / "Library/Application Support/Cursor/User/settings.json",
@@ -316,11 +361,17 @@ def read_selected_models():
     for path in paths:
         data = read_json_file(path)
         if data is None: continue
-        names = []
-        walk_models(data, names)
+        names, stamps = [], {}
+        walk_models(data, names, stamps)
         via = "Cursor" if "Cursor" in str(path) else ("Continue" if "continue" in str(path).lower() else ("Claude" if "claude" in str(path).lower() else "config"))
+        if via.lower() not in running and via != "config":
+            continue
+        claude_file = "claude" in str(path).lower()
         for mid in names:
             if mid.lower() in seen or len(mid) > 120: continue
+            at = stamps.get(mid.lower())
+            if claude_file and not is_current(at):
+                continue
             seen.add(mid.lower())
             provider = "Anthropic" if "claude" in mid.lower() else (
                 "OpenAI" if mid.lower().startswith(("gpt-", "o1", "o3", "o4")) else (
@@ -328,8 +379,49 @@ def read_selected_models():
                 "NVIDIA" if "nvidia" in mid.lower() or "nemotron" in mid.lower() else (
                 "Ollama" if ":" in mid and "/" not in mid else "config"))))
             row = model_row(mid, mid, provider, "datacenter" if provider != "Ollama" else "local",
-                            "configured", "config", via=via)
+                            "configured", "config", via=via, at=at)
             if row: found.append(row)
+    found.extend(read_recent_sessions())
+    return found
+
+def read_recent_sessions():
+    root = Path.home() / ".claude" / "projects"
+    if not root.is_dir():
+        return []
+    cutoff = time.time() - CURRENT_HOURS * 3600
+    found, seen = [], set()
+    try:
+        files = sorted((p for p in root.rglob("*.jsonl") if p.is_file()),
+                       key=lambda p: p.stat().st_mtime, reverse=True)
+    except OSError:
+        return []
+    for fp in files[:12]:
+        try:
+            mtime = fp.stat().st_mtime
+            if mtime < cutoff: continue
+            lines = fp.read_text(encoding="utf-8", errors="ignore").splitlines()[-80:]
+        except OSError:
+            continue
+        for line in reversed(lines):
+            try:
+                obj = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            msg = obj.get("message") if isinstance(obj.get("message"), dict) else {}
+            mid = msg.get("model") or obj.get("model")
+            if not isinstance(mid, str): continue
+            mid = mid.strip()
+            if not mid or mid.startswith("<") or len(mid) > 120: continue
+            ts = obj.get("timestamp") or mtime
+            if not is_current(ts): continue
+            key = mid.lower()
+            if key in seen: break
+            seen.add(key)
+            provider = "Anthropic" if "claude" in key else "config"
+            row = model_row(mid, mid, provider, "datacenter", "in_use", "session",
+                            via="Claude", at=stamp_iso(ts) or now_iso())
+            if row: found.append(row)
+            break
     return found
 
 def aws_headers(method, url, region, service, access, secret, payload=b""):
@@ -453,30 +545,32 @@ def merge_models(rows):
         if not prior or rank.get(row["status"], 0) > rank.get(prior["status"], 0):
             by_key[key] = row
         by_provider.setdefault(row["provider"].lower(), []).append(row)
-    # A live wire to a provider + a named model for that provider means that model is in use.
+    # A live wire + a *current* named pick for that provider. Never a leftover slot.
     for provider, items in by_provider.items():
         live = [m for m in items if m["status"] == "in_use" and m["source"] == "wire"]
-        named = [m for m in items if m.get("status") == "configured" and not str(m["id"]).endswith("-live")]
+        named = [m for m in items if m.get("status") == "configured" and not str(m["id"]).endswith("-live")
+                 and is_current(m.get("at"))]
         if not live or not named: continue
         named.sort(key=lambda m: (0 if m["role"] == "reasoning" else 1))
         chosen = named[0]
         chosen = {**chosen, "status": "in_use", "source": "wire+config",
                   "host": live[0].get("host") or chosen.get("host"),
                   "via": live[0].get("via") or chosen.get("via"),
-                  "where": "datacenter"}
+                  "where": "datacenter", "at": now_iso()}
         by_key[(chosen["provider"].lower(), chosen["id"].lower())] = chosen
         for ghost in live:
             by_key.pop((ghost["provider"].lower(), ghost["id"].lower()), None)
     out = list(by_key.values())
+    out = [m for m in out if m.get("status") != "configured" or is_current(m.get("at"))]
     out.sort(key=lambda m: (-rank.get(m["status"], 0), 0 if m["role"] == "reasoning" else 1, m["provider"], m["name"]))
     return out[:40]
 
-def scan_models(keys=None, force_cloud=False, pid_names=None):
+def scan_models(keys=None, force_cloud=False, pid_names=None, running=None):
     found = []
     found.extend(probe_ollama())
     found.extend(probe_openai_compat_local())
     found.extend(probe_wire(pid_names or {}))
-    found.extend(read_selected_models())
+    found.extend(read_selected_models(running))
     notes = []
     now = time.time()
     with lock: last_cloud = state["cloud_scan_at"]
@@ -544,7 +638,7 @@ def scan_once():
         for item in running:
             for pid in item.get("pids") or []:
                 pid_names[str(pid)] = item["name"]
-    scan_models(pid_names=pid_names)
+    scan_models(pid_names=pid_names, running=[item["name"] for item in running])
     with lock:
         snap = {"armed": state["armed"], "platform": state["platform"], "machine": state["machine"],
                 "running": list(state["running"]), "seen": list(state["seen"]), "ledger": list(state["ledger"][-80:]),
@@ -777,10 +871,11 @@ class Handler(BaseHTTPRequestHandler):
                 if val: merged_keys[key] = val
             with lock:
                 pid_names = {}
+                running_names = [item["name"] for item in state["running"]]
                 for item in state["running"]:
                     for pid in item.get("pids") or []:
                         pid_names[str(pid)] = item["name"]
-            models = scan_models(keys=merged_keys, force_cloud=True, pid_names=pid_names)
+            models = scan_models(keys=merged_keys, force_cloud=True, pid_names=pid_names, running=running_names)
             with lock:
                 self._json({"ok": True, "models": list(state["models"]) if models is not None else models,
                             "note": state["model_note"], "last_scan": state["last_model_scan"]})
@@ -820,11 +915,12 @@ def self_test():
     assert model_role("meta/llama-3.1-nemotron-70b-instruct") == "reasoning"
     assert model_role("whisper-1") == "chat"
     assert keep_reachable("gpt-4o")
+    now = now_iso()
     merged = merge_models([
         model_row("anthropic-live", "Anthropic live session", "Anthropic", "datacenter", "in_use", "wire",
-                  host="api.anthropic.com", via="Cursor"),
+                  host="api.anthropic.com", via="Cursor", at=now),
         model_row("claude-sonnet-4-5", "claude-sonnet-4-5", "Anthropic", "datacenter", "configured", "config",
-                  via="Cursor"),
+                  via="Cursor", at=now),
         model_row("whisper-1", "whisper-1", "OpenAI", "datacenter", "reachable", "openai-catalog",
                   host="api.openai.com"),
     ])
@@ -834,6 +930,33 @@ def self_test():
     assert chosen["status"] == "in_use"
     assert chosen["source"] == "wire+config"
     assert "anthropic-live" not in names
+    stale_at = datetime.fromtimestamp(time.time() - 50 * 3600, timezone.utc).isoformat()
+    leftover = merge_models([
+        model_row("anthropic-live", "Anthropic live session", "Anthropic", "datacenter", "in_use", "wire",
+                  host="api.anthropic.com", via="Claude", at=now),
+        model_row("claude-fable-5", "claude-fable-5", "Anthropic", "datacenter", "configured", "config",
+                  via="Claude", at=stale_at),
+    ])
+    leftover_ids = [m["id"] for m in leftover]
+    assert "anthropic-live" in leftover_ids
+    assert "claude-fable-5" not in leftover_ids
+    assert leftover[0]["status"] == "in_use"
+    names = []
+    walk_models({
+        "cachedGrowthBookFeatures": {"model": "claude-opus-4-7"},
+        "lastModelUsage": {"claude-fable-5": {"inputTokens": 1}},
+        "projects": {"/Users/EverettN/BROCKSTON": {"lastModelUsage": {"claude-fable-5": {}}}},
+        "clientDataCacheSlots": {
+            "old": {"model": "claude-fable-5-1", "at": int((time.time() - 8 * 3600) * 1000)},
+            "now": {"model": "claude-sonnet-4-5", "at": int(time.time() * 1000)},
+        },
+    }, names)
+    assert "claude-opus-4-7" not in names
+    assert "claude-fable-5" not in names
+    assert "claude-fable-5-1" not in names
+    assert "claude-sonnet-4-5" in names
+    assert is_current(now)
+    assert not is_current(stale_at)
     sys.stdout.write("honesty-local self-test ok\n")
     return 0
 

@@ -13,9 +13,9 @@ import { deriveAiSystems, eventTouchesAnyAi, isAiLogin, isOutsideEvent } from "@
 import { deriveThreads } from "@/lib/comms";
 import { deriveUnknownPeople } from "@/lib/people";
 import {
-  fromTheirComputers,
+  currentFromTheirComputers,
+  currentOnYourComputer,
   modelPlainLine,
-  onYourComputerModels,
   statusLabel,
 } from "@/lib/datacenter";
 import { deriveFiles, isComms } from "@/lib/github";
@@ -40,8 +40,8 @@ function Desk() {
   const localMachine = useStation((s) => s.localMachine);
   const datacenterModels = useStation((s) => s.datacenterModels);
   const liveLocal = namedAis.filter((ai) => ai.running && ai.runningFrom === "local");
-  const theirModels = fromTheirComputers(datacenterModels);
-  const localModels = onYourComputerModels(datacenterModels);
+  const theirModels = currentFromTheirComputers(datacenterModels);
+  const localModels = currentOnYourComputer(datacenterModels);
   const files = useMemo(() => deriveFiles(events), [events]);
   const comms = useMemo(() => events.filter(isComms), [events]);
   const threads = useMemo(() => deriveThreads(events), [events]);
@@ -178,9 +178,7 @@ function Desk() {
             {!localSeated ? (
               <li className="text-sm text-muted">Honesty Local is off. Start it to see who is answering from their computers.</li>
             ) : theirModels.length === 0 ? (
-              <li className="text-sm text-muted">
-                None we can see yet. Open Claude or Cursor, or save a key on Keys.
-              </li>
+              <li className="text-sm text-muted">None answering right now.</li>
             ) : null}
           </ul>
           <Link

@@ -293,6 +293,7 @@ export function belongsToStation(
   if (
     event.source === "home" ||
     event.source === "local" ||
+    event.source === "datacenter" ||
     event.source === "mail" ||
     event.source === "wire" ||
     event.source === "calendar" ||
@@ -336,6 +337,7 @@ export const SOURCE_LABEL: Record<AccessEvent["source"], string> = {
   github: "GitHub",
   home: "Home",
   local: "Local",
+  datacenter: "Their computers",
   mail: "Mail",
   wire: "Recorded",
   calendar: "Calendar",

@@ -1,3 +1,4 @@
+import { companyComputers } from "./datacenter.ts";
 import type { AccessEvent, DatacenterModel } from "./types";
 
 export type LocalProcess = {
@@ -71,17 +72,28 @@ export function eventsFromLocal(snap: LocalSnapshot): AccessEvent[] {
   }));
   const models = (snap.models ?? [])
     .filter((model) => model.status === "in_use")
+    .sort((a, b) => Number(b.status === "in_use") - Number(a.status === "in_use"))
     .map((model) => {
       const via = model.via ? ` through ${model.via}` : "";
+      const company = companyComputers(model.provider);
+      const liveNow = model.status === "in_use";
+      const summary =
+        model.where === "datacenter"
+          ? liveNow
+            ? `${model.name} is answering now on ${company}${via}`
+            : `${model.name} is the model ${model.via ?? model.provider} picked on ${company}`
+          : liveNow
+            ? `${model.name} is loaded on this computer${via}`
+            : `${model.name} is installed on this computer`;
       return {
         id: modelEventId(model),
         at: model.at || at,
         kind: "open" as const,
-        source: "local" as const,
+        source: (model.where === "datacenter" ? "datacenter" : "local") as AccessEvent["source"],
         actorLogin: model.provider,
         counterpart: model.name,
         files: [] as string[],
-        summary: `${model.name} is answering now${via}`,
+        summary,
       };
     });
   const ledger = (snap.ledger ?? []).map((item) => ({
@@ -93,5 +105,5 @@ export function eventsFromLocal(snap: LocalSnapshot): AccessEvent[] {
     files: [] as string[],
     summary: item.summary,
   }));
-  return [...live, ...models, ...ledger];
+  return [...models, ...live, ...ledger];
 }

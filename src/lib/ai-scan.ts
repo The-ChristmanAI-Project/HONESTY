@@ -194,7 +194,9 @@ export function isOutsideEvent(
   known: string[],
   named: NamedAi[],
 ): boolean {
-  if (event.source === "local" || event.source === "home") return false;
+  if (event.source === "local" || event.source === "home" || event.source === "datacenter") {
+    return false;
+  }
   return isOutsidePerson(event.actorLogin, owner, known, named);
 }
 

@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Panel } from "@/components/ui/panel";
 import { deriveAiSystems, trailFor } from "@/lib/ai-scan";
-import { fromTheirComputers, modelPlainLine, statusLabel } from "@/lib/datacenter";
+import { currentFromTheirComputers, modelPlainLine, statusLabel } from "@/lib/datacenter";
 import { SOURCE_LABEL } from "@/lib/github";
 import { probeDatacenter } from "@/lib/local-agent";
 import { pullTheRecord, pullTheWire } from "@/lib/pull";
@@ -27,7 +27,7 @@ function SystemsPage() {
   const pulling = useStation((s) => s.pulling);
   const localSeated = useStation((s) => s.localSeated);
   const models = useStation((s) => s.datacenterModels);
-  const theirModels = fromTheirComputers(models);
+  const theirModels = currentFromTheirComputers(models);
   const modelNote = useStation((s) => s.modelNote);
   const [selected, setSelected] = useState<string | null>(null);
   const [name, setName] = useState("");
@@ -132,7 +132,7 @@ function SystemsPage() {
           {theirModels.length === 0 ? (
             <li className="text-sm text-muted">
               {localSeated
-                ? "No model picked and none answering right now."
+                ? "None answering right now."
                 : "Honesty Local is quiet."}
             </li>
           ) : null}

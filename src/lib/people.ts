@@ -87,7 +87,9 @@ function namesOn(event: AccessEvent): string[] {
 }
 
 function rankEvent(event: AccessEvent): number {
-  if (event.source === "local" || event.source === "home") return 0;
+  if (event.source === "local" || event.source === "home" || event.source === "datacenter") {
+    return 0;
+  }
   if (event.source === "github") return 2;
   return 1;
 }
