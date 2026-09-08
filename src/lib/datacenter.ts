@@ -14,6 +14,12 @@ export function currentOnYourComputer(models: Model[]): Model[] {
   return liveModels(onYourComputerModels(models));
 }
 
+export function modelsThrough(models: Model[], via: string): Model[] {
+  const name = via.trim().toLowerCase();
+  if (!name) return [];
+  return liveModels(models).filter((model) => (model.via || "").trim().toLowerCase() === name);
+}
+
 export function reasoningNow(models: Model[]): Model | null {
   const live = liveModels(models);
   return live.find((model) => model.role === "reasoning") ?? live[0] ?? null;

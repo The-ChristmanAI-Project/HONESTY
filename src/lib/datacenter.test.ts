@@ -4,6 +4,7 @@ import {
   companyComputers,
   currentFromTheirComputers,
   fromTheirComputers,
+  modelsThrough,
   liveModels,
   probeBody,
   reasoningLine,
@@ -46,6 +47,8 @@ describe("datacenter model watch", () => {
     assert.equal(statusLabel(catalog), "available");
     assert.equal(fromTheirComputers(models).length, 2);
     assert.equal(currentFromTheirComputers(models).length, 1);
+    assert.equal(modelsThrough(models, "Cursor").length, 1);
+    assert.equal(modelsThrough(models, "Claude").length, 0);
     assert.equal(companyComputers("Anthropic"), "Anthropic's computers");
     assert.equal(companyComputers("Ollama"), "Ollama's cloud");
   });

@@ -127,8 +127,8 @@ function Desk() {
         }
       >
         An AI can run in two places: this computer, or the company's computers (Anthropic,
-        NVIDIA, OpenAI). Drop a screen recording on Bench — hear it, watch it, compare.
-        That is not "people you don't know." No paywall.
+        NVIDIA, OpenAI). THEBENCH takes the tape. This desk watches who is here and who is
+        answering from their computers. That is not "people you don't know." No paywall.
       </PageHeader>
 
       <div className="mt-8 grid items-start gap-4 sm:grid-cols-2">

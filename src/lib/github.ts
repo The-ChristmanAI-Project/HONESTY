@@ -336,7 +336,7 @@ export const KIND_LABEL: Record<EventKind, string> = {
 export const SOURCE_LABEL: Record<AccessEvent["source"], string> = {
   github: "GitHub",
   home: "Home",
-  local: "Local",
+  local: "This computer",
   datacenter: "Their computers",
   mail: "Mail",
   wire: "Recorded",

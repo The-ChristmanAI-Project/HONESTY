@@ -8,7 +8,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Panel } from "@/components/ui/panel";
 import { deriveAiSystems, trailFor } from "@/lib/ai-scan";
-import { currentFromTheirComputers, liveModels, modelPlainLine, statusLabel } from "@/lib/datacenter";
+import {
+  companyComputers,
+  currentFromTheirComputers,
+  liveModels,
+  modelPlainLine,
+  modelsThrough,
+  statusLabel,
+} from "@/lib/datacenter";
 import { SOURCE_LABEL } from "@/lib/github";
 import { probeDatacenter } from "@/lib/local-agent";
 import { pullTheRecord, pullTheWire } from "@/lib/pull";
@@ -187,6 +194,22 @@ function SystemsPage() {
                           : "off"}
                     </Badge>
                   </div>
+                  {modelsThrough(models, system.name).map((model) => (
+                    <p key={model.id} className="mt-1 text-sm text-fg">
+                      {model.name} ·{" "}
+                      {model.where === "datacenter"
+                        ? companyComputers(model.provider)
+                        : "this computer"}
+                    </p>
+                  ))}
+                  {system.running && modelsThrough(models, system.name).length === 0 ? (
+                    <p className="mt-1 text-sm text-muted">
+                      On this computer. No company model answering through {system.name} right now.
+                    </p>
+                  ) : null}
+                  {system.lastSummary ? (
+                    <p className="mt-1 font-mono text-xs text-subtle">{system.lastSummary}</p>
+                  ) : null}
                   <p className="mt-1 font-mono text-xs text-subtle">
                     {system.eventCount} time{system.eventCount === 1 ? "" : "s"}
                     {system.lastAt ? ` · ${relTime(system.lastAt)}` : " · not seen yet"}
@@ -208,11 +231,25 @@ function SystemsPage() {
                   <h2 className="text-xl">{current.name}</h2>
                   <p className="mt-1 text-sm text-muted">
                     {current.running
-                      ? "On this computer now. Honesty Local has it in the process list."
+                      ? "On this computer now."
                       : current.tracking
                         ? "Tracker live. Process list, GitHub, mail, and wire hits attach here."
                         : "Named. Turn watching on to follow it."}
                   </p>
+                  {modelsThrough(models, current.name).map((model) => (
+                    <p key={model.id} className="mt-2 text-sm text-fg">
+                      {model.name} is answering on{" "}
+                      {model.where === "datacenter"
+                        ? companyComputers(model.provider)
+                        : "this computer"}
+                      {model.via ? ` through ${model.via}` : ""}.
+                    </p>
+                  ))}
+                  {current.running && modelsThrough(models, current.name).length === 0 ? (
+                    <p className="mt-2 text-sm text-muted">
+                      No company model answering through {current.name} right now.
+                    </p>
+                  ) : null}
                 </div>
                 {namedAis.some((ai) => ai.id === current.id) ? (
                   <Button
