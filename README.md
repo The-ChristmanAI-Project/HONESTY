@@ -2,7 +2,7 @@
 
 Home-station watch. Yours. No paywall. No account required to run the local half.
 
-Honesty is a two-part system that keeps a ledger of what moved on the home station: GitHub activity, seated mail and wire channels, named AI systems, and — when Honesty Local is running on the computer — which AI desktop programs are actually in the process list.
+Honesty is a two-part system that keeps a ledger of what moved on the home station: GitHub activity, mail, calls, and texts, named AI systems, and — when Honesty Local is running on the computer — which AI desktop programs are in the process list **and which model is answering** (on this computer, or on Anthropic / NVIDIA / OpenAI / AWS).
 
 **Public source:** [The-ChristmanAI-Project/HONESTY](https://github.com/The-ChristmanAI-Project/HONESTY)
 
@@ -16,17 +16,17 @@ Leave both running. They are one watch, not two products.
 
 | Half | Lives | What it can see | What it cannot see |
 |---|---|---|---|
-| **The desk** | This web app (`src/`) | GitHub events, seated mail/wire, folder picks you grant, the ledger, reports, named AIs | Operating-system processes. A browser is not allowed to run `ps` or `tasklist`. |
-| **Honesty Local** | `honesty-local/` on the home station | The process list on *this* computer. Desktop Claude, Cursor, Copilot, ChatGPT app, Ollama, and the rest of the catalog. | Browser tabs. `claude.ai` in Chrome is still Chrome. |
+| **The desk** | This web app (`src/`). Client face on **8788**. | GitHub events, mail, calls, texts, folder picks you grant, the ledger, reports, named AIs, unknown people | Operating-system processes. A browser is not allowed to run `ps` or `tasklist`. |
+| **Honesty Local** | `honesty-local/` on the home station. **8787**. | The process list on *this* computer. Loaded local models (Ollama, NIM). The model at the company computers when a live session or a seated key is present. | Browser tabs. `claude.ai` in Chrome is still Chrome. |
 
-When Honesty Local is up, the desk polls `http://127.0.0.1:8787` and shows **Local seated**. Named AIs that appear in the process list are marked **running** from the computer, not from a guess.
+When Honesty Local is up, the desk polls `http://127.0.0.1:8787`. The desk splits **on your computer** (Claude, Cursor, Ollama the apps) from **from their computers** (the model doing the thinking). That is not “people you don’t know.”
 
 **Binds. Count them. Do not round.**
 
 | Half | Bind | What it is |
 |---|---|---|
-| Honesty Local | `127.0.0.1:8787` | Loopback only. Process watcher + Conductor hook. |
-| The desk | `0.0.0.0:8788` | The web station. Not 8080. Never 8080. |
+| Honesty Local | `127.0.0.1:8787` | Loopback only. Process watcher, model watch, Conductor hook. |
+| The desk | `0.0.0.0:8788` | The web station people see. Not 8080. Never 8080. |
 
 `honesty-local/honesty.py` is one Python 3 file, standard library only. Count the commit you mean. Do not swap dates.
 
@@ -34,7 +34,8 @@ When Honesty Local is up, the desk polls `http://127.0.0.1:8787` and shows **Loc
 |---|---|---|
 | 2026-09-03, as first written | `41d9187` | **456** |
 | 2026-09-04, after compact restore + Conductor rail | `b9648ad` | **284** |
-| Current (binds printed) | `769aa74` | **294** |
+| Binds printed | `769aa74` | **294** |
+| Current (process list + which model is answering) | `8844e16` | **861** |
 
 ---
 
@@ -42,8 +43,9 @@ When Honesty Local is up, the desk polls `http://127.0.0.1:8787` and shows **Loc
 
 - A ledger you own.
 - A station page that arms a watch and keeps reports you choose to keep.
-- A named-AI tracker that follows systems across GitHub, the wire, and (with Local) the process list.
+- A named-AI tracker that follows systems across GitHub, mail, calls, and (with Local) the process list and the model answering.
 - A local Python program with no dependencies beyond the standard library.
+- A people list that does not treat Continue, Ollama, or Claude as strangers. Unknown accounts get **Who is this**.
 
 ## What Honesty is not
 
@@ -57,7 +59,7 @@ When Honesty Local is up, the desk polls `http://127.0.0.1:8787` and shows **Loc
 
 ## Quick start — Honesty Local (the computer)
 
-This is the half that answers “who is running?”
+This is the half that answers “who is running?” and “which model is answering?”
 
 ### Need
 
@@ -90,6 +92,7 @@ One-shot report, no server:
 
 ```bash
 python3 honesty.py --once
+python3 honesty.py --self-test
 ```
 
 On the home station the program binds **only** to `127.0.0.1:8787` and opens that address in your browser. It is not published to the network. A container is the one exception: it sets `HONESTY_LOCAL_HOST=0.0.0.0` so the desk on 8788 can reach it.
@@ -108,7 +111,8 @@ Desk: `http://127.0.0.1:8788` · Local: `http://127.0.0.1:8787` · ledger in the
 ### What you get
 
 - Local page at [http://127.0.0.1:8787](http://127.0.0.1:8787)
-- Armed scan every 8 seconds while the watch is on
+- Armed scan every 8 seconds while the watch is on (process list, Ollama/NIM, live company sessions)
+- Company catalogs (NVIDIA, OpenAI, Anthropic, xAI, Bedrock) at most once a minute, or when the desk asks
 - Ledger written next to the script as `honesty-ledger.json`
 - Downloadable text report at `/api/report.txt`
 
@@ -118,9 +122,11 @@ Desk: `http://127.0.0.1:8788` · Local: `http://127.0.0.1:8787` · ledger in the
 |---|---|---|
 | `GET` | `/` | Local desk HTML |
 | `GET` | `/conductor` | Conductor rail HTML |
-| `GET` | `/api/status` | Current snapshot (JSON) |
+| `GET` | `/api/status` | Current snapshot (JSON), including `models` |
+| `GET` | `/api/models` | Models only (JSON) |
 | `GET` | `/api/conductor` | Conductor-shaped snapshot (JSON) |
 | `POST` | `/api/scan` | Scan now |
+| `POST` | `/api/models/probe` | Body is seated keys from the desk. Used in memory. Never written to disk. |
 | `POST` | `/api/arm` | Body `{ "armed": true \| false }` |
 | `POST` | `/api/conductor/seat` | Body `{ "url": "https://…/ingest" }` |
 | `POST` | `/api/conductor/ingest` | Conductor ruling into the Local ledger |
@@ -152,7 +158,7 @@ honesty-local/
 
 ## Quick start — the desk (the web half)
 
-The desk is the Vite + React station. It keeps GitHub, the wire, people, reports, and the AI list.
+The desk is the Vite + React station on **8788**. It keeps GitHub, mail, calls, people, reports, and the AI list. It is the client face.
 
 ### Need
 
@@ -181,26 +187,26 @@ npm run test
 
 | Path | Page | Job |
 |---|---|---|
-| `/` | Desk | Home of the watch. Arm it. See whether Local is seated. |
-| `/conductor` | Conductor | Honesty reports here. Named programs on this computer. |
-| `/keys` | Keys | NVIDIA, Ollama, AWS, OpenAI, Anthropic. This browser only. |
-| `/station` | Station | Home-station settings, Honesty Local download / seat, poll interval, GitHub user and org. |
-| `/systems` | AIs | Named AI systems. Scan, follow, mark running. Shows Local process hits when seated. |
+| `/` | Desk | Home of the watch. **On your computer** vs **from their computers**. People you don’t know. |
+| `/conductor` | Conductor | Honesty reports here. Named programs on this computer, and which model is answering. |
+| `/keys` | Keys | NVIDIA, Ollama, AWS, OpenAI, Anthropic. This browser only. **See which model** sends keys to Local on loopback, in memory, never to disk. |
+| `/station` | Station | Home-station settings, poll interval, GitHub user and org. |
+| `/systems` | AIs | Named AI systems. Programs here vs the model on the company’s computers. |
 | `/ledger` | Ledger | Every recorded movement. |
-| `/wire` | Wire | Seated communication channels. |
-| `/people` | People | Who touched what. |
+| `/wire` | Mail & calls | Mail, calls, texts, meetings. Path is still `/wire`. |
+| `/people` | People | Who showed up. Unknown accounts get **Who is this**. Continue / Ollama / Claude are AIs, not strangers. |
 | `/reports` | Reports | Keep a report. |
 
-### Tracker labels on AIs
+### Labels on the desk
 
 | Label | Means |
 |---|---|
-| **running** | Honesty Local saw the program in the process list, or you marked it by hand. |
-| **following** | The watch is armed on that name. |
-| **seen** | It has events in the ledger. |
-| **named** | You put it on the list. No events yet. |
+| **On your computer** | Honesty Local saw the app in the process list (Claude, Cursor, Ollama, Continue, …). |
+| **From their computers** | The model doing the thinking (for example `claude-opus-4-7` on Anthropic). |
+| **People you don’t know** | A GitHub account, mail address, or name you have not named. Not the cloud AI. **Who is this** looks them up. |
+| **Watching / Off** | The watch is on or off. |
 
-The desk **cannot** invent “running” from a website visit. If Local is down, the desk says so.
+The desk **cannot** invent “running” from a website visit. If Local is down, the desk says Honesty Local is off.
 
 ### How the desk seats Local
 
@@ -210,15 +216,15 @@ The desk **cannot** invent “running” from a website visit. If Local is down,
 2. Copies running programs onto the named AI list (`runningFrom: "local"`).
 3. Writes Local start/stop rows into the ledger with source `local`.
 
-If Local goes quiet, the desk keeps the wire and tells you Local went quiet.
+If Local goes quiet, the desk keeps the record and tells you Honesty Local is off.
 
 ### Folder scan
 
 The desk can look at a folder you pick (File System Access API). That is evidence on disk — path names, aliases in the tree — not a live process list. Granting a folder is opt-in. The browser will not walk the whole home drive unless you choose that folder.
 
-### GitHub and the wire
+### GitHub, mail, and calls
 
-The desk pulls GitHub for the configured user (`EverettNC` by default) and optional org (The Christman AI Project). Mail, calendar, Outlook, and Teams rows exist as wire sources. They only fill when those channels are seated. Nothing is scraped from a phone in the background.
+The desk pulls GitHub for the configured user (`EverettNC` by default) and optional org (The Christman AI Project). Mail, calendar, Outlook, and Teams rows exist as communication sources. They only fill when those channels are connected. Nothing is scraped from a phone in the background.
 
 Refresh GitHub permission if pulls fail:
 
@@ -234,8 +240,8 @@ Grant **EverettNC**. Org access needs org admin.
 1. Start Honesty Local on the home station (`Start Honesty.bat` / `.command`).
 2. Leave the Local window running. Confirm [http://127.0.0.1:8787](http://127.0.0.1:8787) says **ARMED**.
 3. Open the desk at [http://127.0.0.1:8788](http://127.0.0.1:8788).
-4. Station should read **Local seated**. Conductor is `/conductor`.
-5. AIs that are desktop programs show **running** with process counts and PIDs from Local.
+4. The desk should show programs **on your computer** and models **from their computers**. Conductor is `/conductor`.
+5. Desktop programs show process counts and PIDs from Local. The model answering shows under **from their computers**.
 6. Keep a report from either half when you want a snapshot on paper.
 
 That is the whole watch.
@@ -249,11 +255,13 @@ HONESTY/
   README.md                 # this file
   package.json              # desk scripts and dependencies
   vite.config.ts
-  honesty-local/            # process watcher — run on the computer
+  honesty-local/            # process + model watcher — run on the computer
   src/
-    routes/                 # desk pages
+    routes/                 # desk pages (8788)
     lib/
       local-agent.ts        # desk ↔ Local bridge
+      datacenter.ts         # on your computer vs their computers
+      people.ts             # unknown people + Who is this
       ai-scan.ts            # named AI catalog + matching
       store.ts              # station state (Zustand)
       github.ts             # GitHub pull
@@ -288,6 +296,7 @@ Runtime files that should stay off git:
 
 - Owner: Everett / The Christman AI Project
 - Public source: `The-ChristmanAI-Project/HONESTY`
+- Personal home: `EverettNC/HONESTY` — same `main`. Commit once. Push both.
 - Honesty Local: no account, no telemetry, no paywall
 - The desk source is in this repo. Run it yourself.
 
