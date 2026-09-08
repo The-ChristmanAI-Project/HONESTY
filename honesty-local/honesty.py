@@ -776,9 +776,9 @@ def report_text(snap):
     if not running: lines.append("  None of the named AI desktop programs are in the process list.")
     else:
         for item in running: lines.append(f"  {item['name']} · {item['count']} process · pids {', '.join(item['pids'])}")
-    lines += ["", "MODELS"]
-    models = snap.get("models") or []
-    if not models: lines.append("  No loaded local model and no datacenter model detected.")
+    lines += ["", "ANSWERING NOW"]
+    models = [m for m in (snap.get("models") or []) if m.get("status") == "in_use"]
+    if not models: lines.append("  None answering right now.")
     else:
         for item in models:
             where = "datacenter" if item.get("where") == "datacenter" else "this computer"

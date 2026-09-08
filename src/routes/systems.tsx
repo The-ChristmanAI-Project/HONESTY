@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Panel } from "@/components/ui/panel";
 import { deriveAiSystems, trailFor } from "@/lib/ai-scan";
-import { currentFromTheirComputers, modelPlainLine, statusLabel } from "@/lib/datacenter";
+import { currentFromTheirComputers, liveModels, modelPlainLine, statusLabel } from "@/lib/datacenter";
 import { SOURCE_LABEL } from "@/lib/github";
 import { probeDatacenter } from "@/lib/local-agent";
 import { pullTheRecord, pullTheWire } from "@/lib/pull";
@@ -104,11 +104,10 @@ function SystemsPage() {
               setProbing(true);
               void probeDatacenter().then((ok) => {
                 setProbing(false);
+                const n = liveModels(useStation.getState().datacenterModels).length;
                 toast(
                   ok
-                    ? `Read ${useStation.getState().datacenterModels.length} model${
-                        useStation.getState().datacenterModels.length === 1 ? "" : "s"
-                      }.`
+                    ? `Read ${n} model${n === 1 ? "" : "s"} answering.`
                     : "Honesty Local did not answer.",
                 );
               });

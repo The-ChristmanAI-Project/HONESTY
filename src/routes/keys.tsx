@@ -27,6 +27,7 @@ import {
   type KeySlotId,
   type KeyVault,
 } from "@/lib/keys";
+import { liveModels } from "@/lib/datacenter";
 import { probeDatacenter } from "@/lib/local-agent";
 import { useStation } from "@/lib/store";
 import { cn } from "@/lib/utils";
@@ -38,7 +39,7 @@ function KeysPage() {
   const [over, setOver] = useState(false);
   const [probing, setProbing] = useState(false);
   const localSeated = useStation((s) => s.localSeated);
-  const models = useStation((s) => s.datacenterModels);
+  const models = liveModels(useStation((s) => s.datacenterModels));
 
   useEffect(() => {
     setVault(readVault());
@@ -144,7 +145,7 @@ function KeysPage() {
           setProbing(true);
           void probeDatacenter(vault).then((ok) => {
             setProbing(false);
-            const n = useStation.getState().datacenterModels.length;
+            const n = liveModels(useStation.getState().datacenterModels).length;
             toast(
               ok
                 ? `Read ${n} model${n === 1 ? "" : "s"}. Keys were not written to disk.`

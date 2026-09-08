@@ -1,6 +1,7 @@
 import { format } from "date-fns";
 import { deriveAiSystems, isAiLogin, isOutsideEvent, isOutsidePerson } from "./ai-scan";
 import { deriveChannels, counterpartOf } from "./comms";
+import { liveModels } from "./datacenter.ts";
 import { deriveActors, deriveFiles, isComms, isTrustedActor, KIND_LABEL, SOURCE_LABEL } from "./github";
 import type { AccessEvent, DatacenterModel, HonestyReport, NamedAi, StationSettings } from "./types";
 
@@ -30,6 +31,7 @@ export function buildReport(
     isOutsidePerson(actor.login, owner, knownActors, namedAis),
   );
   const systems = deriveAiSystems(events, namedAis, armed);
+  const answering = liveModels(models);
   const window =
     events.length === 0
       ? "no events yet"
@@ -48,7 +50,7 @@ export function buildReport(
     `  Files / targets: ${files.length}`,
     `  Actors: ${actors.length}`,
     `  AI systems: ${systems.length}`,
-    `  Datacenter models: ${models.length}`,
+    `  Datacenter models: ${answering.length}`,
     `  Outside actors: ${outside.length}`,
     "",
     "CHANNELS",
@@ -77,10 +79,10 @@ export function buildReport(
   }
 
   lines.push("", "DATACENTER");
-  if (models.length === 0) {
-    lines.push("  None detected. Honesty Local reads which model is answering.");
+  if (answering.length === 0) {
+    lines.push("  None answering right now. Honesty Local reads which model is answering.");
   } else {
-    for (const model of models) {
+    for (const model of answering) {
       const where = model.where === "datacenter" ? "datacenter" : "this computer";
       const via = model.via ? ` via ${model.via}` : "";
       lines.push(
