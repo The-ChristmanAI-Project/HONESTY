@@ -33,7 +33,6 @@ const FILTERS = [
   { key: "call", label: "Call" },
   { key: "message", label: "Text" },
   { key: "meeting", label: "Meeting" },
-  { key: "github", label: "GitHub" },
   { key: "hand", label: "Recorded" },
 ] as const;
 
@@ -84,8 +83,6 @@ function WirePage() {
         if (event.kind !== "message") return false;
       } else if (filter === "meeting") {
         if (event.kind !== "meeting") return false;
-      } else if (filter === "github") {
-        if (event.source !== "github") return false;
       } else if (filter === "hand") {
         if (event.source !== "wire") return false;
       }

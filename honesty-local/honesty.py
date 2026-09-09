@@ -35,12 +35,16 @@ DC_HOSTS = {
     "api.x.ai": "xAI", "grok.x.ai": "xAI",
     "integrate.api.nvidia.com": "NVIDIA", "inference.nvidia.com": "NVIDIA",
     "ai.api.nvidia.com": "NVIDIA", "api.nvcf.nvidia.com": "NVIDIA",
-    "generativelanguage.googleapis.com": "Gemini", "api.mistral.ai": "Mistral",
+    "generativelanguage.googleapis.com": "Gemini", "gemini.google.com": "Gemini",
+    "bard.google.com": "Gemini", "api.mistral.ai": "Mistral",
     "api.groq.com": "Groq", "openrouter.ai": "OpenRouter", "ollama.com": "Ollama",
 }
 DC_PREFIX = (
     ("2607:6bc0:", "Anthropic"),
     ("160.79.104.", "Anthropic"),
+    ("2001:4860:4826:", "Gemini"),
+    ("2001:4860:4840:", "Gemini"),
+    ("2001:4860:4841:", "Gemini"),
 )
 APP_COMPANY = {
     "Claude": "Anthropic", "ChatGPT": "OpenAI", "Grok": "xAI", "Gemini": "Gemini",
@@ -157,7 +161,7 @@ def match_ai(proc):
     for name, aliases in CATALOG:
         for alias in [name.lower(), *aliases]:
             if alias and alias in hay:
-                if browser and alias == "continue": continue
+                if browser: continue
                 if alias == "grok" and "grok_seat" in hay: continue
                 return name
     return None
@@ -287,12 +291,15 @@ def probe_wire(pid_names):
         remote = conn.get("remote") or ""
         hostport = remote_host(remote)
         host = ips.get(hostport) or hostport
+        pname = (conn.get("name") or "").lower()
         via = match_ai({"name": conn.get("name") or "", "cmd": conn.get("name") or ""})
         if not via: via = pid_names.get(str(conn.get("pid") or ""))
         provider = host_provider(host)
         if not provider and via in APP_COMPANY and hostport not in ("127.0.0.1", "::1", "localhost"):
             provider = APP_COMPANY[via]
         if not provider: continue
+        if not via and provider == "Gemini" and pname in ("google", "chrome"):
+            via = "Chrome"
         key = (provider, host)
         if key in seen: continue
         seen.add(key)
@@ -627,23 +634,29 @@ def scan_models(keys=None, force_cloud=False, pid_names=None, running=None):
     merged = merge_models(found)
     at = now_iso()
     with lock:
-        prior = {(m.get("provider"), m.get("id"), m.get("status")) for m in state["models"]}
+        prior_rows = list(state["models"])
+        prior = {(m.get("provider"), m.get("id"), m.get("status")) for m in prior_rows}
         now_set = {(m.get("provider"), m.get("id"), m.get("status")) for m in merged}
         if state["armed"]:
             for item in merged:
                 key = (item.get("provider"), item.get("id"), item.get("status"))
                 if key in prior: continue
                 if item.get("status") != "in_use": continue
-                where = "at the datacenter" if item.get("where") == "datacenter" else "on this computer"
+                place = "datacenter" if item.get("where") == "datacenter" else "local"
+                where = "at the datacenter" if place == "datacenter" else "on this computer"
                 via = f" via {item['via']}" if item.get("via") else ""
                 state["ledger"].append({
                     "at": at, "kind": "model", "name": item["provider"],
+                    "source": place,
                     "summary": f"{item['name']} is the {item['role']} model {where}{via}",
                 })
             for provider, mid, status in sorted(prior - now_set):
                 if status != "in_use": continue
+                old = next((m for m in prior_rows if (m.get("provider"), m.get("id"), m.get("status")) == (provider, mid, status)), None)
+                place = "datacenter" if (old or {}).get("where") == "datacenter" else "local"
                 state["ledger"].append({
                     "at": at, "kind": "model", "name": provider,
+                    "source": place,
                     "summary": f"{mid} is no longer the live {provider} model",
                 })
         state["models"] = merged
@@ -669,13 +682,15 @@ def scan_once():
             item["at"] = at
             if item["name"] not in prior:
                 state["ledger"].append({"at": at, "kind": "start", "name": item["name"],
+                                        "source": "local",
                                         "summary": f"{item['name']} is running on {state['machine']}"})
             seen = next((s for s in state["seen"] if s["name"] == item["name"]), None)
             if seen: seen["lastAt"] = at; seen["count"] = seen.get("count", 0) + 1; seen["pids"] = item["pids"]
             else: state["seen"].append({"name": item["name"], "firstAt": at, "lastAt": at, "count": 1, "pids": item["pids"]})
         if state["armed"]:
             for name in sorted(prior - now_names):
-                state["ledger"].append({"at": at, "kind": "stop", "name": name, "summary": f"{name} is no longer in the process list"})
+                state["ledger"].append({"at": at, "kind": "stop", "name": name, "source": "local",
+                                        "summary": f"{name} is no longer in the process list"})
         state["running"] = running; state["last_scan"] = at; state["ledger"] = state["ledger"][-400:]
         pid_names = {}
         for item in running:
@@ -977,12 +992,16 @@ def self_test():
     assert host_provider("api.anthropic.com") == "Anthropic"
     assert host_provider("2607:6bc0::10") == "Anthropic"
     assert host_provider("claude.ai") == "Anthropic"
+    assert host_provider("gemini.google.com") == "Gemini"
+    assert host_provider("2001:4860:4826:200::") == "Gemini"
     assert host_provider("api.openai.com") == "OpenAI"
     assert host_provider("integrate.api.nvidia.com") == "NVIDIA"
     assert host_provider("bedrock-runtime.us-east-1.amazonaws.com") == "AWS"
     assert host_provider("chrome.google.com") is None
     assert match_ai({"name": "grok", "cmd": "grok"}) == "Grok"
     assert match_ai({"name": "python3", "cmd": "python3 /Users/EverettN/mcp-media-ingestor/grok_seat.py"}) is None
+    assert match_ai({"name": "Google Chrome", "cmd": "Google Chrome https://gemini.google.com"}) is None
+    assert match_ai({"name": "Claude", "cmd": "/Applications/Claude.app/Contents/MacOS/Claude"}) == "Claude"
     assert model_role("o3-mini") == "reasoning"
     assert model_role("claude-sonnet-4-5") == "reasoning"
     assert model_role("meta/llama-3.1-nemotron-70b-instruct") == "reasoning"
@@ -1060,8 +1079,9 @@ def main():
         f"Conductor rail: {url}/conductor\n"
         f"Yours. No paywall.\n"
     )
-    try: webbrowser.open(f"{url}/conductor" if "--conductor" in sys.argv else url)
-    except Exception: pass
+    if "--no-browser" not in sys.argv and os.environ.get("HONESTY_NO_BROWSER") != "1":
+        try: webbrowser.open(f"{url}/conductor" if "--conductor" in sys.argv else url)
+        except Exception: pass
     try: httpd.serve_forever()
     except KeyboardInterrupt: return 0
     return 0

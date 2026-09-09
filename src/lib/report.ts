@@ -152,7 +152,7 @@ export function buildReport(
       : event.actorLogin;
     const extra = event.files.length ? ` · ${event.files.slice(0, 3).join(", ")}` : "";
     lines.push(
-      `  ${stamp(event.at)}  ${who}  ${KIND_LABEL[event.kind]}  ${event.summary}${extra}`,
+      `  ${stamp(event.at)}  ${who}  ${KIND_LABEL[event.kind]}  ${SOURCE_LABEL[event.source]}  ${event.summary}${extra}`,
     );
   }
 

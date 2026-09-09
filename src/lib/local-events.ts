@@ -1,5 +1,24 @@
 import { companyComputers } from "./datacenter.ts";
-import type { AccessEvent, DatacenterModel } from "./types";
+import type { AccessEvent, DatacenterModel, EventSource } from "./types";
+
+const KNOWN_SOURCES: EventSource[] = [
+  "github",
+  "home",
+  "local",
+  "datacenter",
+  "mail",
+  "wire",
+  "calendar",
+  "outlook",
+  "teams",
+];
+
+export function ledgerSource(value: unknown): EventSource {
+  if (typeof value === "string" && (KNOWN_SOURCES as string[]).includes(value)) {
+    return value as EventSource;
+  }
+  return "local";
+}
 
 export type LocalProcess = {
   name: string;
@@ -20,6 +39,7 @@ export type LocalLedgerItem = {
   kind: string;
   name: string;
   summary: string;
+  source?: string;
 };
 
 export type LocalSnapshot = {
@@ -40,18 +60,30 @@ export function modelEventId(model: DatacenterModel): string {
   return `local-model-${model.provider}-${model.id}`.toLowerCase();
 }
 
+/** Live-now cards only. Ledger history uses `local-model-{name}-{ISO}` and must stay. */
+export function isLiveNowId(id: string): boolean {
+  const lower = id.toLowerCase();
+  if (lower.startsWith("local-live-")) return true;
+  return lower.startsWith("local-model-") && !/\d{4}-\d{2}-\d{2}t/.test(lower);
+}
+
+export function dropLiveNow(events: AccessEvent[]): AccessEvent[] {
+  return events.filter((event) => !isLiveNowId(event.id));
+}
+
 export function pruneStaleLive(
   events: AccessEvent[],
   runningNames: Set<string>,
   modelIds?: Set<string>,
 ): AccessEvent[] {
   return events.filter((event) => {
-    if (event.id.startsWith("local-live-")) {
-      return runningNames.has(event.id.slice("local-live-".length).toLowerCase());
+    const id = event.id.toLowerCase();
+    if (id.startsWith("local-live-")) {
+      return runningNames.has(id.slice("local-live-".length));
     }
-    if (event.id.startsWith("local-model-")) {
+    if (isLiveNowId(event.id)) {
       if (!modelIds) return true;
-      return modelIds.has(event.id.toLowerCase());
+      return modelIds.has(id);
     }
     return true;
   });
@@ -100,7 +132,7 @@ export function eventsFromLocal(snap: LocalSnapshot): AccessEvent[] {
     id: `local-${item.kind}-${item.name}-${item.at}`,
     at: item.at,
     kind: (item.kind === "stop" ? "other" : "open") as AccessEvent["kind"],
-    source: "local" as const,
+    source: ledgerSource(item.source),
     actorLogin: item.name,
     files: [] as string[],
     summary: item.summary,

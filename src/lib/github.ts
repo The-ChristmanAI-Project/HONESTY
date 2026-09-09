@@ -356,9 +356,6 @@ export function isComms(event: AccessEvent): boolean {
     return true;
   }
   return (
-    event.kind === "comment" ||
-    event.kind === "issue" ||
-    event.kind === "pull" ||
     event.kind === "mail" ||
     event.kind === "call" ||
     event.kind === "message" ||

@@ -1,4 +1,4 @@
-import { isComms } from "./github";
+import { isComms } from "./github.ts";
 import type { AccessEvent, EventKind } from "./types";
 
 export type ChannelCount = {
@@ -27,7 +27,6 @@ export function deriveChannels(events: AccessEvent[]): ChannelCount[] {
   const call = comms.filter((event) => event.kind === "call").length;
   const message = comms.filter((event) => event.kind === "message").length;
   const meeting = comms.filter((event) => event.kind === "meeting").length;
-  const github = comms.filter((event) => event.source === "github").length;
   const hand = comms.filter((event) => event.source === "wire").length;
   return [
     { key: "all", label: "All", count: comms.length },
@@ -35,7 +34,6 @@ export function deriveChannels(events: AccessEvent[]): ChannelCount[] {
     { key: "call", label: "Call", count: call },
     { key: "message", label: "Text", count: message },
     { key: "meeting", label: "Meeting", count: meeting },
-    { key: "github", label: "GitHub", count: github },
     { key: "hand", label: "Recorded", count: hand },
   ];
 }

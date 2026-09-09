@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { belongsToStation, mergeEvents } from "./github";
-import { modelEventId, pruneStaleLive } from "./local-events";
+import { dropLiveNow, ledgerSource, modelEventId, pruneStaleLive } from "./local-events";
 import { SEED_EVENTS } from "./seed";
 import type {
   AccessEvent,
@@ -279,7 +279,7 @@ export const useStation = create<StationState>()(
             id: `local-${item.kind}-${item.name}-${item.at}`,
             at: item.at,
             kind: (item.kind === "stop" ? "other" : "open") as AccessEvent["kind"],
-            source: "local" as const,
+            source: ledgerSource(item.source),
             actorLogin: item.name,
             files: [] as string[],
             summary: item.summary,
@@ -311,10 +311,7 @@ export const useStation = create<StationState>()(
           namedAis: state.namedAis.map((ai) =>
             ai.runningFrom === "local" ? { ...ai, running: false, runningFrom: undefined } : ai,
           ),
-          events: state.events.filter(
-            (event) =>
-              !event.id.startsWith("local-live-") && !event.id.startsWith("local-model-"),
-          ),
+          events: dropLiveNow(state.events),
         })),
       addKnown: (login) =>
         set((state) => {

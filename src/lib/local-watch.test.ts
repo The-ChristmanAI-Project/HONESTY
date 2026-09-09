@@ -1,7 +1,12 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { belongsToStation, mergeEvents } from "./github.ts";
-import { eventsFromLocal, pruneStaleLive, type LocalSnapshot } from "./local-events.ts";
+import {
+  dropLiveNow,
+  eventsFromLocal,
+  pruneStaleLive,
+  type LocalSnapshot,
+} from "./local-events.ts";
 import type { AccessEvent } from "./types.ts";
 
 const owner = "EverettNC";
@@ -61,6 +66,50 @@ describe("local watch stays on the desk", () => {
     assert.match(events[0]?.summary ?? "", /17 processes/);
   });
 
+  it("keeps an old ledger line as this computer when no source was written", () => {
+    const snap: LocalSnapshot = {
+      armed: true,
+      platform: "Darwin",
+      machine: "Everett.lan",
+      last_scan: "2026-09-08T19:15:39.000Z",
+      running: [],
+      ledger: [
+        {
+          at: "2026-09-08T04:59:30.424842+00:00",
+          kind: "model",
+          name: "Gemini",
+          summary: "Gemini live session is the chat model at the datacenter",
+        },
+      ],
+    };
+    const events = eventsFromLocal(snap);
+    const row = events.find((event) => event.actorLogin === "Gemini");
+    assert.equal(row?.source, "local");
+    assert.match(row?.summary ?? "", /at the datacenter/);
+  });
+
+  it("keeps a new ledger line's written place", () => {
+    const snap: LocalSnapshot = {
+      armed: true,
+      platform: "Darwin",
+      machine: "Everett.lan",
+      last_scan: "2026-09-08T19:20:00.000Z",
+      running: [],
+      ledger: [
+        {
+          at: "2026-09-08T19:20:00.000Z",
+          kind: "model",
+          name: "Gemini",
+          source: "datacenter",
+          summary: "Gemini live session is the chat model at the datacenter",
+        },
+      ],
+    };
+    const events = eventsFromLocal(snap);
+    const row = events.find((event) => event.actorLogin === "Gemini");
+    assert.equal(row?.source, "datacenter");
+  });
+
   it("drops live lines when a program leaves the process list", () => {
     const kept = pruneStaleLive(
       [localOpen("Claude"), localOpen("Continue")],
@@ -69,6 +118,36 @@ describe("local watch stays on the desk", () => {
     assert.deepEqual(
       kept.map((event) => event.id),
       ["local-live-Claude"],
+    );
+  });
+
+  it("keeps model history when the live card drops", () => {
+    const history: AccessEvent = {
+      id: "local-model-Gemini-2026-09-08T23:56:56.085202+00:00",
+      at: "2026-09-08T23:56:56.085202+00:00",
+      kind: "open",
+      source: "datacenter",
+      actorLogin: "Gemini",
+      files: [],
+      summary: "Gemini live session is the chat model at the datacenter via Chrome",
+    };
+    const live: AccessEvent = {
+      id: "local-model-gemini-gemini-live",
+      at: "2026-09-08T23:56:56.085202+00:00",
+      kind: "open",
+      source: "datacenter",
+      actorLogin: "Gemini",
+      files: [],
+      summary: "Gemini live session is answering now",
+    };
+    const kept = pruneStaleLive([history, live, localOpen("Claude")], new Set(["claude"]), new Set());
+    assert.deepEqual(
+      kept.map((event) => event.id),
+      [history.id, "local-live-Claude"],
+    );
+    assert.deepEqual(
+      dropLiveNow([history, live, localOpen("Claude")]).map((event) => event.id),
+      [history.id],
     );
   });
 

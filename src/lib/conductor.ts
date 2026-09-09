@@ -58,7 +58,7 @@ export type ConductorFeed = {
   wing: string;
   hook: string | null;
   beings: ConductorBeing[];
-  ledger: { at: string; kind: string; name: string; summary: string }[];
+  ledger: { at: string; kind: string; name: string; summary: string; source?: string }[];
   running: { name: string; count: number; pids: string[] }[];
   models?: DatacenterModel[];
   model_note?: string | null;
