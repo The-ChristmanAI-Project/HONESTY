@@ -246,6 +246,13 @@ def resolve_dc_ips():
     _dns_cache["ips"] = ips
     return ips
 
+def connection_from_lsof(line):
+    parts = line.split()
+    if len(parts) < 9: return None
+    name = next((part for part in reversed(parts) if "->" in part), "")
+    if not name: return None
+    return {"pid": parts[1], "name": parts[0], "remote": name.split("->", 1)[1]}
+
 def list_connections():
     system = platform.system()
     rows = []
@@ -270,12 +277,8 @@ def list_connections():
             except subprocess.CalledProcessError:
                 continue
             for line in raw.splitlines()[1:]:
-                parts = line.split()
-                if len(parts) < 9: continue
-                name = parts[-1]
-                if "->" not in name: continue
-                remote = name.split("->", 1)[1]
-                rows.append({"pid": parts[1], "name": parts[0], "remote": remote})
+                row = connection_from_lsof(line)
+                if row: rows.append(row)
         return rows
     except (OSError, subprocess.CalledProcessError):
         return []
@@ -1014,6 +1017,12 @@ def self_test():
     assert match_ai({"name": "Google Chrome", "cmd": "Google Chrome https://chatgpt.com"}) is None
     assert match_ai({"name": "ChatGPT", "cmd": "/Applications/ChatGPT.app/Contents/MacOS/ChatGPT"}) == "ChatGPT"
     assert match_ai({"name": "Claude", "cmd": "/Applications/Claude.app/Contents/MacOS/Claude"}) == "Claude"
+    parsed = connection_from_lsof(
+        "Google 10826 EverettN 30u IPv6 0x1 0t0 TCP "
+        "[2607:fb91::1]:52202->[2606:4700:4408::ac40:9bd1]:443 (ESTABLISHED)"
+    )
+    assert parsed and parsed["remote"] == "[2606:4700:4408::ac40:9bd1]:443"
+    assert remote_host(parsed["remote"]) == "2606:4700:4408::ac40:9bd1"
     assert model_role("o3-mini") == "reasoning"
     assert model_role("claude-sonnet-4-5") == "reasoning"
     assert model_role("meta/llama-3.1-nemotron-70b-instruct") == "reasoning"
