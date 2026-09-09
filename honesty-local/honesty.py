@@ -31,13 +31,20 @@ CATALOG = [
     ("Mistral", ["mistral"]), ("Codeium", ["codeium", "windsurf"]),
 ]
 DC_HOSTS = {
-    "api.anthropic.com": "Anthropic", "claude.ai": "Anthropic", "api.openai.com": "OpenAI",
+    "api.anthropic.com": "Anthropic", "claude.ai": "Anthropic",
+    "api.openai.com": "OpenAI", "chatgpt.com": "OpenAI", "www.chatgpt.com": "OpenAI",
+    "chat.openai.com": "OpenAI", "ab.chatgpt.com": "OpenAI", "ws.chatgpt.com": "OpenAI",
     "api.x.ai": "xAI", "grok.x.ai": "xAI",
     "integrate.api.nvidia.com": "NVIDIA", "inference.nvidia.com": "NVIDIA",
     "ai.api.nvidia.com": "NVIDIA", "api.nvcf.nvidia.com": "NVIDIA",
     "generativelanguage.googleapis.com": "Gemini", "gemini.google.com": "Gemini",
     "bard.google.com": "Gemini", "api.mistral.ai": "Mistral",
     "api.groq.com": "Groq", "openrouter.ai": "OpenRouter", "ollama.com": "Ollama",
+}
+BROWSER_VIA = {
+    "google": "Chrome", "chrome": "Chrome", "chromium": "Chrome",
+    "safari": "Safari", "firefox": "Firefox", "brave": "Brave",
+    "msedge": "Edge", "edge": "Edge",
 }
 DC_PREFIX = (
     ("2607:6bc0:", "Anthropic"),
@@ -298,8 +305,8 @@ def probe_wire(pid_names):
         if not provider and via in APP_COMPANY and hostport not in ("127.0.0.1", "::1", "localhost"):
             provider = APP_COMPANY[via]
         if not provider: continue
-        if not via and provider == "Gemini" and pname in ("google", "chrome"):
-            via = "Chrome"
+        if not via:
+            via = BROWSER_VIA.get(pname)
         key = (provider, host)
         if key in seen: continue
         seen.add(key)
@@ -995,12 +1002,17 @@ def self_test():
     assert host_provider("gemini.google.com") == "Gemini"
     assert host_provider("2001:4860:4826:200::") == "Gemini"
     assert host_provider("api.openai.com") == "OpenAI"
+    assert host_provider("chatgpt.com") == "OpenAI"
+    assert host_provider("chat.openai.com") == "OpenAI"
+    assert host_provider("ws.chatgpt.com") == "OpenAI"
     assert host_provider("integrate.api.nvidia.com") == "NVIDIA"
     assert host_provider("bedrock-runtime.us-east-1.amazonaws.com") == "AWS"
     assert host_provider("chrome.google.com") is None
     assert match_ai({"name": "grok", "cmd": "grok"}) == "Grok"
     assert match_ai({"name": "python3", "cmd": "python3 /Users/EverettN/mcp-media-ingestor/grok_seat.py"}) is None
     assert match_ai({"name": "Google Chrome", "cmd": "Google Chrome https://gemini.google.com"}) is None
+    assert match_ai({"name": "Google Chrome", "cmd": "Google Chrome https://chatgpt.com"}) is None
+    assert match_ai({"name": "ChatGPT", "cmd": "/Applications/ChatGPT.app/Contents/MacOS/ChatGPT"}) == "ChatGPT"
     assert match_ai({"name": "Claude", "cmd": "/Applications/Claude.app/Contents/MacOS/Claude"}) == "Claude"
     assert model_role("o3-mini") == "reasoning"
     assert model_role("claude-sonnet-4-5") == "reasoning"
