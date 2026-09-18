@@ -35,6 +35,7 @@ DC_HOSTS = {
     "api.openai.com": "OpenAI", "chatgpt.com": "OpenAI", "www.chatgpt.com": "OpenAI",
     "chat.openai.com": "OpenAI", "ab.chatgpt.com": "OpenAI", "ws.chatgpt.com": "OpenAI",
     "api.x.ai": "xAI", "grok.x.ai": "xAI",
+    "grok.com": "xAI", "www.grok.com": "xAI", "assets.grok.com": "xAI",
     "integrate.api.nvidia.com": "NVIDIA", "inference.nvidia.com": "NVIDIA",
     "ai.api.nvidia.com": "NVIDIA", "api.nvcf.nvidia.com": "NVIDIA",
     "generativelanguage.googleapis.com": "Gemini", "gemini.google.com": "Gemini",
@@ -1007,6 +1008,9 @@ def self_test():
     assert host_provider("api.openai.com") == "OpenAI"
     assert host_provider("chatgpt.com") == "OpenAI"
     assert host_provider("chat.openai.com") == "OpenAI"
+    assert host_provider("grok.com") == "xAI"
+    assert host_provider("www.grok.com") == "xAI"
+    assert host_provider("api.x.ai") == "xAI"
     assert host_provider("ws.chatgpt.com") == "OpenAI"
     assert host_provider("integrate.api.nvidia.com") == "NVIDIA"
     assert host_provider("bedrock-runtime.us-east-1.amazonaws.com") == "AWS"
