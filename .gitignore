@@ -9,3 +9,6 @@ honesty-local/conductor-hook.json
 honesty-local/conductor-outbox.json
 honesty-local/squadron.local.json
 honesty-local/*.json.tmp
+
+# logs never belong in the repository
+*.log
