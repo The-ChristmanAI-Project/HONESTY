@@ -1,6 +1,4 @@
 import { createRootRoute, HeadContent, Link, Outlet, Scripts } from "@tanstack/react-router";
-import { AuthProvider } from "@/lib/auth/provider";
-import { PreviewHostBridge } from "@/components/preview-host-bridge";
 import { AppShell } from "@/components/app-shell";
 import { Toaster } from "sonner";
 import appCss from "../styles.css?url";
@@ -47,8 +45,6 @@ export const Route = createRootRoute({
         href: "https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;1,9..144,500&family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&family=Newsreader:ital,opsz,wght@0,6..72,300;0,6..72,400;0,6..72,500;1,6..72,400&display=swap",
       },
       { rel: "stylesheet", href: appCss },
-      { rel: "manifest", href: "/__grok/manifest.webmanifest" },
-      { rel: "apple-touch-icon", href: "/__grok/icon-180.png" },
     ],
   }),
   notFoundComponent: NotFoundPage,
@@ -58,19 +54,16 @@ export const Route = createRootRoute({
         <HeadContent />
       </head>
       <body>
-        <PreviewHostBridge />
-        <AuthProvider>
-          <AppShell>
-            <Outlet />
-          </AppShell>
-          <Toaster
-            theme="dark"
-            position="bottom-right"
-            toastOptions={{
-              className: "font-sans bg-surface text-fg border border-border",
-            }}
-          />
-        </AuthProvider>
+        <AppShell>
+          <Outlet />
+        </AppShell>
+        <Toaster
+          theme="dark"
+          position="bottom-right"
+          toastOptions={{
+            className: "font-sans bg-surface text-fg border border-border",
+          }}
+        />
         <Scripts />
       </body>
     </html>

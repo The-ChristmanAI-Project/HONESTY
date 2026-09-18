@@ -10,7 +10,6 @@ import type {
   ManualWatch,
   NamedAi,
   StationSettings,
-  WireSourceStatus,
 } from "./types";
 
 const TOKEN_KEY = "honesty.github-token";
@@ -35,11 +34,6 @@ export type StationState = {
   warnings: string[];
   rateRemaining: number | null;
   folderLabel: string | null;
-  mailWarning: string | null;
-  mailLoginUrl: string | null;
-  mailLoginRequired: boolean;
-  pullingMail: boolean;
-  wireSources: WireSourceStatus[];
   localSeated: boolean;
   localMachine: string | null;
   localPlatform: string | null;
@@ -100,14 +94,6 @@ export type StationState = {
   addReport: (report: HonestyReport) => void;
   removeReport: (id: string) => void;
   setFolderLabel: (label: string | null) => void;
-  applyMail: (input: {
-    events: AccessEvent[];
-    warning: string | null;
-    loginRequired: boolean;
-    loginUrl?: string;
-    sources?: WireSourceStatus[];
-  }) => void;
-  setPullingMail: (pulling: boolean) => void;
   clearLedger: () => void;
 };
 
@@ -129,11 +115,6 @@ export const useStation = create<StationState>()(
       warnings: [],
       rateRemaining: null,
       folderLabel: null,
-      mailWarning: null,
-      mailLoginUrl: null,
-      mailLoginRequired: false,
-      pullingMail: false,
-      wireSources: [],
       localSeated: false,
       localMachine: null,
       localPlatform: null,
@@ -346,16 +327,6 @@ export const useStation = create<StationState>()(
       removeReport: (id) =>
         set((state) => ({ reports: state.reports.filter((report) => report.id !== id) })),
       setFolderLabel: (folderLabel) => set({ folderLabel }),
-      setPullingMail: (pullingMail) => set({ pullingMail }),
-      applyMail: ({ events, warning, loginRequired, loginUrl, sources }) =>
-        set((state) => ({
-          events: mergeEvents(state.events, events),
-          mailWarning: warning,
-          mailLoginRequired: loginRequired,
-          mailLoginUrl: loginUrl ?? null,
-          pullingMail: false,
-          wireSources: sources ?? state.wireSources,
-        })),
       clearLedger: () => set({ events: [], warnings: [], lastError: null }),
     }),
     {

@@ -19,7 +19,7 @@ import {
   statusLabel,
 } from "@/lib/datacenter";
 import { deriveFiles, isComms } from "@/lib/github";
-import { pullTheRecord, pullTheWire } from "@/lib/pull";
+import { pullTheRecord } from "@/lib/pull";
 import { useStation } from "@/lib/store";
 import { relTime } from "@/lib/time";
 import { cn } from "@/lib/utils";
@@ -34,7 +34,6 @@ function Desk() {
   const known = useStation((s) => s.knownActors);
   const lastFetchedAt = useStation((s) => s.lastFetchedAt);
   const warnings = useStation((s) => s.warnings);
-  const mailWarning = useStation((s) => s.mailWarning);
   const namedAis = useStation((s) => s.namedAis);
   const localSeated = useStation((s) => s.localSeated);
   const localMachine = useStation((s) => s.localMachine);
@@ -83,9 +82,8 @@ function Desk() {
     const next = !armed;
     useStation.getState().setArmed(next);
     if (next) {
-      toast("Watching. Checking GitHub, mail, and AIs.");
+      toast("Watching. Checking GitHub and AIs.");
       await pullTheRecord();
-      await pullTheWire();
       const found = deriveAiSystems(
         useStation.getState().events,
         useStation.getState().namedAis,
@@ -100,8 +98,8 @@ function Desk() {
   }
 
   async function onPull() {
-    const [record, wire] = await Promise.all([pullTheRecord(), pullTheWire(true)]);
-    const n = (record?.events.length ?? 0) + (wire?.events.length ?? 0);
+    const record = await pullTheRecord();
+    const n = record?.events.length ?? 0;
     if (n > 0 || record?.ok) {
       toast(`Updated · ${n} this time`);
     } else {
@@ -213,9 +211,6 @@ function Desk() {
             </li>
           ))}
         </ul>
-      ) : null}
-      {mailWarning ? (
-        <p className="mt-2 text-sm text-muted">Mail is optional. Record by hand either way.</p>
       ) : null}
 
       <Panel className="mt-6">

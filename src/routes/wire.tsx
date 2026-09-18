@@ -8,10 +8,8 @@ import { Button } from "@/components/ui/button";
 import { Chip } from "@/components/ui/chip";
 import { Input, Textarea } from "@/components/ui/input";
 import { Panel } from "@/components/ui/panel";
-import { redirectToLoginIfRequired } from "@/lib/app-data";
 import { DIRECTION_LABEL, counterpartOf, deriveChannels, deriveThreads } from "@/lib/comms";
 import { KIND_LABEL, isComms } from "@/lib/github";
-import { pullTheWire } from "@/lib/pull";
 import { useStation } from "@/lib/store";
 import { relTime } from "@/lib/time";
 import type { CommDirection, EventKind } from "@/lib/types";
@@ -49,11 +47,6 @@ function WirePage() {
   const events = useStation((s) => s.events);
   const settings = useStation((s) => s.settings);
   const known = useStation((s) => s.knownActors);
-  const mailWarning = useStation((s) => s.mailWarning);
-  const mailLoginRequired = useStation((s) => s.mailLoginRequired);
-  const mailLoginUrl = useStation((s) => s.mailLoginUrl);
-  const pullingMail = useStation((s) => s.pullingMail);
-  const wireSources = useStation((s) => s.wireSources);
   const [kind, setKind] = useState<EventKind>("message");
   const [direction, setDirection] = useState<CommDirection>("in");
   const [who, setWho] = useState("");
@@ -153,41 +146,10 @@ function WirePage() {
       </dl>
 
       <div className="mt-6 flex flex-wrap items-center gap-2">
-        <Button variant="secondary" onClick={() => void pullTheWire(true)} disabled={pullingMail}>
-          {pullingMail ? "Loading mail" : "Load mail"}
-        </Button>
-        {mailLoginRequired && mailLoginUrl ? (
-          <Button
-            variant="ghost"
-            onClick={() =>
-              redirectToLoginIfRequired({
-                ok: false,
-                data: null,
-                loginRequired: true,
-                loginUrl: mailLoginUrl,
-              })
-            }
-          >
-            Continue with Grok to load your data.
-          </Button>
-        ) : null}
         <Badge tone={comms.length ? "sage" : "muted"}>
           {comms.length} recorded
         </Badge>
       </div>
-      {mailWarning ? <p className="mt-3 text-sm text-muted">{mailWarning}</p> : null}
-      {wireSources.length > 0 ? (
-        <ul className="mt-3 flex flex-wrap gap-2">
-          {wireSources.map((source) => (
-            <li key={source.id}>
-              <Badge tone={source.seated ? "sage" : "muted"}>
-                {source.label}
-                {source.seated ? ` · ${source.count}` : " · optional"}
-              </Badge>
-            </li>
-          ))}
-        </ul>
-      ) : null}
 
       <Panel className="mt-6">
         <form onSubmit={record} className="space-y-4">

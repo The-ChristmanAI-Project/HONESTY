@@ -93,9 +93,8 @@ function StationPage() {
         <h2 className="text-xl">Channels</h2>
         <p className="mt-2 text-sm text-muted">
           This desk is yours with no subscription. GitHub public events pull without a token.
-          Optional GitHub token stays in this browser. Mail, calendar, Outlook, and Teams load
-          only if already connected in Grok — optional, never required. Calls, SMS, iMessage,
-          Signal, and WhatsApp are recorded by hand. Start watching to scan GitHub, mail, calls,
+          Optional GitHub token stays in this browser. Mail, calendar, calls, SMS, iMessage,
+          Signal, and WhatsApp are recorded by hand. No outside system loads them. Start watching to scan GitHub, mail, calls,
           and named AIs — then follow each in the record. Honesty Local reads the process list
           for named AI desktop programs and which model is answering. Kernel file-opens
           and phone taps are not claimed.

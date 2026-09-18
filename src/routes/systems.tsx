@@ -18,7 +18,7 @@ import {
 } from "@/lib/datacenter";
 import { SOURCE_LABEL } from "@/lib/github";
 import { probeDatacenter } from "@/lib/local-agent";
-import { pullTheRecord, pullTheWire } from "@/lib/pull";
+import { pullTheRecord } from "@/lib/pull";
 import { useStation } from "@/lib/store";
 import { relTime } from "@/lib/time";
 import { cn } from "@/lib/utils";
@@ -50,7 +50,7 @@ function SystemsPage() {
   const trail = current ? trailFor(current, events) : [];
 
   async function scan() {
-    await Promise.all([pullTheRecord(), pullTheWire(true)]);
+    await pullTheRecord();
     const next = deriveAiSystems(
       useStation.getState().events,
       useStation.getState().namedAis,
