@@ -183,3 +183,6 @@ Error: aborted
 2:43:35 AM [vite] (ssr) page reload src/routes/index.tsx
 2:43:56 AM [vite] (client) hmr update /src/styles.css?direct, /src/components/app-shell.tsx, /src/routes/index.tsx?tsr-split=component, /src/components/unknown-person.tsx, /src/routes/ledger.tsx?tsr-split=component
 2:43:56 AM [vite] (ssr) page reload src/lib/store.ts
+3:30:48 AM [vite] vite.config.ts changed, restarting server...
+3:30:48 AM [vite] server restarted.
+3:30:48 AM [vite] (ssr) connected.
