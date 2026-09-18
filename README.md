@@ -227,12 +227,9 @@ The desk can look at a folder you pick (File System Access API). That is evidenc
 
 ### GitHub, mail, and calls
 
-The desk pulls GitHub for the configured user (`EverettNC` by default) and optional org (The Christman AI Project). Mail, calendar, Outlook, and Teams rows exist as communication sources. They only fill when those channels are connected. Nothing is scraped from a phone in the background.
+The desk pulls GitHub for the configured user (`EverettNC` by default) and optional org (The Christman AI Project). Mail, calendar, calls and texts are written by hand. No outside system loads them, and nothing is scraped from a phone in the background.
 
-Refresh GitHub permission if pulls fail:
-
-- OAuth apps: [github.com/settings/applications](https://github.com/settings/applications)
-- Installed apps: [github.com/settings/installations](https://github.com/settings/installations)
+If GitHub pulls fail, check the token kept in this browser on the Keys page, or the authorized applications at [github.com/settings/applications](https://github.com/settings/applications).
 
 Grant **EverettNC**. Org access needs org admin.
 
@@ -280,7 +277,8 @@ HONESTY/
 Runtime files that should stay off git:
 
 - `honesty-local/honesty-ledger.json`
-- local env and preview logs under `.grok/`
+- `.preview.pid` and `.preview.log` from the preview script
+- any `*.log`
 
 ---
 

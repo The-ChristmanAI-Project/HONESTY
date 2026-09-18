@@ -117,7 +117,7 @@ export function buildReport(
   lines.push("", "COMMUNICATIONS");
   if (comms.length === 0) {
     lines.push(
-      "  None recorded. Mail, calendar, Outlook, and Teams load when seated through Grok.",
+      "  None recorded. Mail, calendar, and meetings are written by hand on this desk.",
     );
     lines.push("  Calls, texts, Signal, iMessage, and meetings this desk cannot hear are written by hand.");
   } else {
@@ -158,7 +158,6 @@ export function buildReport(
 
   lines.push("", "LIMITS");
   lines.push("  This desk tracks communication it can see, and communication you write.");
-  lines.push("  Gmail, Calendar, Outlook, and Teams load only when seated through Grok.");
   lines.push("  Phone calls, SMS, iMessage, Signal, WhatsApp, and other apps are on the record only if you write them here.");
   lines.push("  GitHub is the public record this desk can see from a browser. Private GitHub needs a token kept in this browser.");
   lines.push("  Honesty Local reads named AI desktop programs from this computer's process list.");

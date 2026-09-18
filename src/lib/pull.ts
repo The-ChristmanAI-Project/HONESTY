@@ -1,6 +1,5 @@
 import { pullStation } from "./github.fn";
 import { pullLocal } from "./local-agent";
-import { pullWire } from "./wire.fn";
 import { readToken, useStation } from "./store";
 
 export async function pullTheRecord() {
@@ -31,25 +30,6 @@ export async function pullTheRecord() {
       warnings: [message],
       fetchedAt: new Date().toISOString(),
       rateRemaining: null,
-    });
-    return null;
-  }
-}
-
-export async function pullTheWire(force = true) {
-  const state = useStation.getState();
-  if (!force && state.mailLoginRequired) return null;
-  state.setPullingMail(true);
-  try {
-    const result = await pullWire();
-    useStation.getState().applyMail(result);
-    return result;
-  } catch (err) {
-    const message = err instanceof Error ? err.message : "Wire pull failed.";
-    useStation.getState().applyMail({
-      events: [],
-      warning: message,
-      loginRequired: false,
     });
     return null;
   }

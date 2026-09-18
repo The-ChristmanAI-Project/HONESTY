@@ -17,7 +17,7 @@ import { Intro, introAlreadyPlayed } from "@/components/intro";
 import { DESK_BIND, LOCAL_BIND } from "@/lib/conductor";
 import { canPickFolder, hasFolder, scanFolder } from "@/lib/folder-watch";
 import { pullDatacenterIfKeyed, pullLocal } from "@/lib/local-agent";
-import { pullTheRecord, pullTheWire } from "@/lib/pull";
+import { pullTheRecord } from "@/lib/pull";
 import { useStation } from "@/lib/store";
 import { cn } from "@/lib/utils";
 
@@ -67,7 +67,6 @@ export function AppShell({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!hydrated) return;
     void pullTheRecord();
-    if (useStation.getState().armed) void pullTheWire(false);
   }, [hydrated]);
 
   useEffect(() => {
@@ -89,7 +88,6 @@ export function AppShell({ children }: { children: ReactNode }) {
     if (!armed || !hydrated) return;
     const id = window.setInterval(() => {
       void pullTheRecord();
-      void pullTheWire(false);
       if (canPickFolder() && hasFolder()) {
         void scanFolder(actor).then((events) => {
           for (const event of events) useStation.getState().addEvent(event);

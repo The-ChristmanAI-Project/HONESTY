@@ -94,14 +94,6 @@ export type ManualWatch = {
   note: string;
 };
 
-export type WireSourceStatus = {
-  id: string;
-  label: string;
-  seated: boolean;
-  count: number;
-  note: string | null;
-};
-
 export type NamedAi = {
   id: string;
   name: string;
