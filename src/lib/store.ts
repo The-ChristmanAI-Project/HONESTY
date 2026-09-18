@@ -90,7 +90,7 @@ export type StationState = {
     platform?: string;
     running?: { name: string }[];
     models?: DatacenterModel[];
-    ledger?: { at: string; kind: string; name: string; summary: string }[];
+    ledger?: { at: string; kind: string; name: string; summary: string; source?: string }[];
   }) => void;
   markLocalGone: () => void;
   addKnown: (login: string) => void;

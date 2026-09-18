@@ -95,9 +95,19 @@ export const pullStation = createServerFn({ method: "POST" })
     const orgRaw = data.org ? sanitizeLogin(data.org) : "";
     const org = orgRaw && isValidLogin(orgRaw) ? orgRaw : "";
 
+    // Without a token GitHub returns public activity only. Private repositories
+    // are invisible on that path, so a quiet feed can mean "nothing happened" or
+    // "everything happened in private." The desk says which, rather than letting
+    // an old date stand as a fact.
     const eventsPath = token
       ? `/users/${username}/events?per_page=40`
       : `/users/${username}/events/public?per_page=40`;
+
+    if (!token) {
+      warnings.push(
+        "Public activity only. Work in private repositories is not visible on this feed, so the newest date here is not necessarily your newest work. Add a token to see private activity.",
+      );
+    }
 
     const [profile, ownEvents, reposRaw, orgEvents] = await Promise.all([
       ghJson<GhUser>(`/users/${username}`, token, warnings, remaining),
