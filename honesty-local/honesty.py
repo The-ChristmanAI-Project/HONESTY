@@ -442,6 +442,18 @@ def read_selected_models(running=None):
     return found
 
 def read_recent_sessions():
+    """Models named by a recent transcript — named, not observed answering.
+
+    A finished .jsonl and a live one are identical on disk. The only thing that
+    tells them apart is whether something is still writing, and reading a file
+    cannot see that. So these rows are "recent": this model was answering here
+    within CURRENT_HOURS. They say who, never that it is still going.
+
+    A wire row is what observes liveness. merge_models promotes a recent row to
+    in_use only when an open socket to that provider is seen at the same time,
+    which is the only pairing that earns the present tense: the name from the
+    transcript, the "now" from the wire.
+    """
     root = Path.home() / ".claude" / "projects"
     if not root.is_dir():
         return []
@@ -475,7 +487,7 @@ def read_recent_sessions():
             if key in seen: break
             seen.add(key)
             provider = "Anthropic" if "claude" in key else "config"
-            row = model_row(mid, mid, provider, "datacenter", "in_use", "session",
+            row = model_row(mid, mid, provider, "datacenter", "recent", "session",
                             via="Claude", at=stamp_iso(ts) or now_iso())
             if row: found.append(row)
             break
@@ -593,7 +605,7 @@ def probe_cloud(keys):
     return found, notes
 
 def merge_models(rows):
-    rank = {"in_use": 3, "configured": 2, "reachable": 1}
+    rank = {"in_use": 4, "recent": 3, "configured": 2, "reachable": 1}
     by_key, by_provider = {}, {}
     for row in rows:
         if not row: continue
@@ -606,7 +618,7 @@ def merge_models(rows):
     # is older than CURRENT_HOURS. Leftover configured rows still drop.
     for provider, items in by_provider.items():
         live = [m for m in items if m["status"] == "in_use" and m["source"] == "wire"]
-        named = [m for m in items if m.get("status") == "configured" and not str(m["id"]).endswith("-live")]
+        named = [m for m in items if m.get("status") in ("configured", "recent") and not str(m["id"]).endswith("-live")]
         if not live or not named: continue
         used = set()
         for ghost in live:
@@ -624,7 +636,7 @@ def merge_models(rows):
             by_key[(chosen["provider"].lower(), chosen["id"].lower())] = chosen
             by_key.pop((ghost["provider"].lower(), ghost["id"].lower()), None)
     out = list(by_key.values())
-    out = [m for m in out if m.get("status") != "configured" or is_current(m.get("at"))]
+    out = [m for m in out if m.get("status") not in ("configured", "recent") or is_current(m.get("at"))]
     out.sort(key=lambda m: (-rank.get(m["status"], 0), 0 if m["role"] == "reasoning" else 1, m["provider"], m["name"]))
     return out[:40]
 
@@ -1045,6 +1057,36 @@ def self_test():
                   via="Claude", at=stale_at),
     ])
     assert "claude-fable-5" not in [m["id"] for m in orphan]
+
+    # A transcript names a model. It never proves one is still answering.
+    # Alone, the row stays "recent" and is kept out of every live count.
+    alone = merge_models([
+        model_row("claude-sonnet-5", "claude-sonnet-5", "Anthropic", "datacenter", "recent", "session",
+                  via="Claude", at=now),
+    ])
+    solo = next(m for m in alone if m["id"] == "claude-sonnet-5")
+    assert solo["status"] == "recent", solo["status"]
+    assert not [m for m in alone if m["status"] == "in_use"]
+
+    # With an open socket seen at the same moment, the pair earns the present
+    # tense: the name off the transcript, the "now" off the wire.
+    paired = merge_models([
+        model_row("anthropic-live", "Anthropic live session", "Anthropic", "datacenter", "in_use", "wire",
+                  host="api.anthropic.com", via="Claude", at=now),
+        model_row("claude-sonnet-5", "claude-sonnet-5", "Anthropic", "datacenter", "recent", "session",
+                  via="Claude", at=now),
+    ])
+    live = next(m for m in paired if m["id"] == "claude-sonnet-5")
+    assert live["status"] == "in_use", live["status"]
+    assert live["source"] == "wire+config"
+    assert "anthropic-live" not in [m["id"] for m in paired]
+
+    # A recent row older than the window drops, exactly as a configured one does.
+    aged = merge_models([
+        model_row("claude-sonnet-5", "claude-sonnet-5", "Anthropic", "datacenter", "recent", "session",
+                  via="Claude", at=stale_at),
+    ])
+    assert "claude-sonnet-5" not in [m["id"] for m in aged]
     names, stamps = [], {}
     old_ms = int((time.time() - 8 * 3600) * 1000)
     now_ms = int(time.time() * 1000)

@@ -103,7 +103,7 @@ export function eventsFromLocal(snap: LocalSnapshot): AccessEvent[] {
     }`,
   }));
   const models = (snap.models ?? [])
-    .filter((model) => model.status === "in_use")
+    .filter((model) => model.status === "in_use" || model.status === "recent")
     .sort((a, b) => Number(b.status === "in_use") - Number(a.status === "in_use"))
     .map((model) => {
       const via = model.via ? ` through ${model.via}` : "";
@@ -113,10 +113,10 @@ export function eventsFromLocal(snap: LocalSnapshot): AccessEvent[] {
         model.where === "datacenter"
           ? liveNow
             ? `${model.name} is answering now on ${company}${via}`
-            : `${model.name} is the model ${model.via ?? model.provider} picked on ${company}`
+            : `${model.name} was answering on ${company}${via}`
           : liveNow
             ? `${model.name} is loaded on this computer${via}`
-            : `${model.name} is installed on this computer`;
+            : `${model.name} was loaded on this computer${via}`;
       return {
         id: modelEventId(model),
         at: model.at || at,

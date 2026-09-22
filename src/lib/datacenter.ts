@@ -57,6 +57,10 @@ export function statusLabel(model: Model): string {
   if (model.status === "in_use") {
     return model.where === "datacenter" ? "answering now" : "on this computer";
   }
+  // Named by a transcript, not seen on the wire. It was answering; it may not be now.
+  if (model.status === "recent") {
+    return model.where === "datacenter" ? "recently answering" : "recently on this computer";
+  }
   if (model.status === "configured") return "picked";
   return "available";
 }
