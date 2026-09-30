@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { toast } from "sonner";
+import { ScamCardView } from "@/components/scam-card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -39,8 +40,16 @@ export function UnknownPersonRow({ person }: { person: UnknownPerson }) {
             <p className="mt-1 text-sm text-muted">{person.lastSummary}</p>
           ) : null}
         </div>
-        <Badge tone="danger">you don't know them</Badge>
+        <div className="flex flex-col items-end gap-1">
+          <Badge tone="danger">you don't know them</Badge>
+          {person.scam?.level === "case" ? (
+            <Badge tone="danger">this person may not exist</Badge>
+          ) : null}
+          {person.scam?.level === "flag" ? <Badge tone="paper">one thing to watch</Badge> : null}
+        </div>
       </div>
+
+      {person.scam && person.scam.level !== "clear" ? <ScamCardView scamCase={person.scam} /> : null}
 
       {who ? (
         <div className="mt-3 rounded-md border border-border bg-surface-2 px-3 py-3">

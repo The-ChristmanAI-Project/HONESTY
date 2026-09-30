@@ -1,6 +1,8 @@
 import { format } from "date-fns";
 import { deriveAiSystems, isAiLogin, isOutsideEvent, isOutsidePerson } from "./ai-scan";
 import { deriveChannels, counterpartOf } from "./comms";
+import { deriveUnknownPeople } from "./people.ts";
+import { cardText } from "./scam.ts";
 import { liveModels } from "./datacenter.ts";
 import { deriveActors, deriveFiles, isComms, isTrustedActor, KIND_LABEL, SOURCE_LABEL } from "./github";
 import type { AccessEvent, DatacenterModel, HonestyReport, NamedAi, StationSettings } from "./types";
@@ -101,6 +103,24 @@ export function buildReport(
           actor.lastAt ? ` · last ${stamp(actor.lastAt)}` : ""
         }`,
       );
+    }
+  }
+
+  lines.push("", "MAY NOT EXIST");
+  const strangers = deriveUnknownPeople(events, owner, knownActors, namedAis, (login) =>
+    isAiLogin(login, namedAis),
+  );
+  const cases = strangers.filter((p) => p.scam && p.scam.level !== "clear");
+  if (cases.length === 0) {
+    lines.push("  No stranger on the record matches a scam move.");
+  } else {
+    for (const p of cases) {
+      const c = p.scam!;
+      lines.push(
+        `  ${c.who} — ${c.level.toUpperCase()} — ${c.contacts} contact${c.contacts === 1 ? "" : "s"} · ${stamp(c.firstAt)} → ${stamp(c.lastAt)}`,
+      );
+      for (const line of cardText(c)) lines.push(`  ${line}`);
+      lines.push("");
     }
   }
 

@@ -102,6 +102,7 @@ const defaultSettings: StationSettings = {
   githubUser: "EverettNC",
   githubOrg: "The-ChristmanAI-Project",
   pollSeconds: 180,
+  trustedContact: "",
 };
 
 export const useStation = create<StationState>()(

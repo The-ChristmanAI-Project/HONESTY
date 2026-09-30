@@ -1,6 +1,6 @@
 const STORAGE = "honesty.keys.v1";
 
-export type KeySlotId = "nvidia" | "ollama" | "aws" | "openai" | "anthropic" | "xai";
+export type KeySlotId = "nvidia" | "ollama" | "aws" | "openai" | "anthropic" | "xai" | "twilio";
 
 export type KeyVault = {
   nvidia: string;
@@ -11,6 +11,8 @@ export type KeyVault = {
   awsAccessKeyId: string;
   awsSecretAccessKey: string;
   awsRegion: string;
+  twilioAccountSid: string;
+  twilioAuthToken: string;
 };
 
 export const EMPTY_VAULT: KeyVault = {
@@ -22,6 +24,8 @@ export const EMPTY_VAULT: KeyVault = {
   awsAccessKeyId: "",
   awsSecretAccessKey: "",
   awsRegion: "",
+  twilioAccountSid: "",
+  twilioAuthToken: "",
 };
 
 export const KEY_SLOTS: {
@@ -35,6 +39,7 @@ export const KEY_SLOTS: {
   { id: "openai", label: "OpenAI", hint: "OPENAI_API_KEY" },
   { id: "anthropic", label: "Anthropic", hint: "ANTHROPIC_API_KEY" },
   { id: "xai", label: "xAI", hint: "XAI_API_KEY" },
+  { id: "twilio", label: "Twilio", hint: "account SID + auth token · Check the number on People" },
 ];
 
 const ALIASES: Record<string, keyof KeyVault> = {
@@ -56,6 +61,8 @@ const ALIASES: Record<string, keyof KeyVault> = {
   AWS_SECRET_ACCESS_KEY: "awsSecretAccessKey",
   AWS_REGION: "awsRegion",
   AWS_DEFAULT_REGION: "awsRegion",
+  TWILIO_ACCOUNT_SID: "twilioAccountSid",
+  TWILIO_AUTH_TOKEN: "twilioAuthToken",
 };
 
 export function emptyVault(): KeyVault {
@@ -78,6 +85,8 @@ export function readVault(): KeyVault {
       awsSecretAccessKey:
         typeof parsed.awsSecretAccessKey === "string" ? parsed.awsSecretAccessKey : "",
       awsRegion: typeof parsed.awsRegion === "string" ? parsed.awsRegion : "",
+      twilioAccountSid: typeof parsed.twilioAccountSid === "string" ? parsed.twilioAccountSid : "",
+      twilioAuthToken: typeof parsed.twilioAuthToken === "string" ? parsed.twilioAuthToken : "",
     };
   } catch {
     return emptyVault();
@@ -96,6 +105,7 @@ export function clearVault() {
 
 export function slotSeated(vault: KeyVault, id: KeySlotId): boolean {
   if (id === "aws") return Boolean(vault.awsAccessKeyId && vault.awsSecretAccessKey);
+  if (id === "twilio") return Boolean(vault.twilioAccountSid && vault.twilioAuthToken);
   return Boolean(vault[id]);
 }
 
@@ -125,6 +135,7 @@ function guessBare(vault: KeyVault, value: string) {
   else if (clean.startsWith("xai-")) vault.xai = clean;
   else if (clean.startsWith("sk-")) vault.openai = clean;
   else if (/^AKIA[0-9A-Z]{16}$/i.test(clean)) vault.awsAccessKeyId = clean;
+  else if (/^AC[0-9a-f]{32}$/i.test(clean)) vault.twilioAccountSid = clean;
   else if (/^nvapi-/i.test(clean) || /^nvdev-/i.test(clean)) vault.nvidia = clean;
 }
 

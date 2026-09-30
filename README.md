@@ -248,6 +248,35 @@ That is the whole watch.
 
 ---
 
+## May not exist — the Scam Operation section
+
+Everything else on this desk answers to the station owner. This section answers to the person on the other end of a stranger's mail, text, or call: the one being told the deployed soldier needs gift cards, the surgeon abroad needs a customs fee, keep it between us, it has to be today.
+
+It reads what this desk can see for each person you don't know and names the moves it saw. The rule, stated once: one move is a flag. Three moves is a case. Money plus any other move is a case. A leave-papers ask, or being asked to receive or forward money or packages, is a case on its own.
+
+The moves it reads: asked for money · says they cannot be reached in person · wants to move off the app · asked for secrecy · says it has to be now · will not show a live face · professed love fast · leave, release or fee for a soldier · wants you to receive or forward money or packages.
+
+When it fires, the People row gets **this person may not exist** and a card in plain words:
+
+- **What it saw** — the person's own lines, quoted.
+- **What it means** — that this is the script, that it is not about her. If they claim military, it quotes what Army CID says a real soldier never needs.
+- **What to do now** — do not send anything, do not tell them you checked, show this to someone you trust, report it.
+
+Two buttons run real checks from the browser:
+
+| Button | What it does | Needs |
+|---|---|---|
+| **Check the number** | Twilio Lookup: is the number real, what country, what kind of line (a US internet number is not a base overseas), what carrier. | Twilio account SID + auth token on the Keys page. Without one it says *not checked*. |
+| **Check the address** | Public DNS: does the domain take mail, does it publish SPF. Registry (RDAP): when the domain was registered. Free mail providers are named as such. | Nothing. No key. |
+
+**Show this to someone I trust** sends the card, with any checks run, to the mail or phone named on the Station page. Without one, it copies the card.
+
+What this section will not do: verify anyone's military service. The government does not hand that to civilians, and any product that says it does is lying. Reverse-image search is not in this section until there is a service we can name.
+
+Cases appear in reports under **MAY NOT EXIST**. Source: `src/lib/scam.ts`. Tests: `src/lib/scam.test.ts`.
+
+---
+
 ## Repository layout
 
 ```
@@ -262,6 +291,7 @@ HONESTY/
       local-agent.ts        # desk ↔ Local bridge
       datacenter.ts         # on your computer vs their computers
       people.ts             # unknown people + Who is this
+      scam.ts               # may not exist — reads the moves, writes the card, runs the checks
       ai-scan.ts            # named AI catalog + matching
       store.ts              # station state (Zustand)
       github.ts             # GitHub pull

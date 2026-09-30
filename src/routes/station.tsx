@@ -30,6 +30,7 @@ function StationPage() {
   const [org, setOrg] = useState(settings.githubOrg);
   const [station, setStation] = useState(settings.stationName);
   const [poll, setPoll] = useState(String(settings.pollSeconds));
+  const [trusted, setTrusted] = useState(settings.trustedContact ?? "");
   const [token, setToken] = useState("");
   const [hasToken, setHasToken] = useState(false);
   const [watchPath, setWatchPath] = useState("");
@@ -48,6 +49,7 @@ function StationPage() {
       githubOrg: org.trim(),
       stationName: station.trim() || "Home Station",
       pollSeconds: Number.isFinite(seconds) ? Math.min(900, Math.max(60, seconds)) : 180,
+      trustedContact: trusted.trim(),
     });
     toast("Station saved.");
   }
@@ -126,6 +128,18 @@ function StationPage() {
               value={poll}
               onChange={(e) => setPoll(e.target.value)}
             />
+          </label>
+          <label className="block text-sm">
+            Someone you trust (mail or phone)
+            <Input
+              className="mt-2"
+              value={trusted}
+              onChange={(e) => setTrusted(e.target.value)}
+              placeholder="misty@example.com or 614 555 0100"
+            />
+            <span className="mt-1 block text-xs text-subtle">
+              When a stranger on People may not exist, the card can go straight to this person.
+            </span>
           </label>
           <Button type="submit">Save station</Button>
         </form>

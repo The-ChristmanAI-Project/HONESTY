@@ -1,4 +1,5 @@
 import { SOURCE_LABEL, isTrustedActor, isValidLogin, sanitizeLogin } from "./github.ts";
+import { deriveScamCase, type ScamCase } from "./scam.ts";
 import type { AccessEvent, EventKind, NamedAi } from "./types.ts";
 
 export type UnknownPerson = {
@@ -14,6 +15,7 @@ export type UnknownPerson = {
   why: string;
   files: string[];
   sources: string[];
+  scam: ScamCase | null;
 };
 
 const DEED: Record<EventKind, string> = {
@@ -145,6 +147,7 @@ export function deriveUnknownPeople(
         why: whyUnknown(last),
         files: [...files],
         sources: [...sources],
+        scam: deriveScamCase(bucket.name ?? bucket.login, bucket.events),
       };
     })
     .sort((a, b) => (a.lastAt < b.lastAt ? 1 : -1));

@@ -212,6 +212,8 @@ function KeyCard({
   const [awsId, setAwsId] = useState("");
   const [awsSecret, setAwsSecret] = useState("");
   const [awsRegion, setAwsRegion] = useState(vault.awsRegion);
+  const [twSid, setTwSid] = useState("");
+  const [twToken, setTwToken] = useState("");
 
   function keep(event: FormEvent) {
     event.preventDefault();
@@ -226,6 +228,10 @@ function KeyCard({
       if (awsSecret.trim()) next.awsSecretAccessKey = awsSecret.trim();
       if (awsRegion.trim()) next.awsRegion = awsRegion.trim();
     }
+    if (id === "twilio") {
+      if (twSid.trim()) next.twilioAccountSid = twSid.trim();
+      if (twToken.trim()) next.twilioAuthToken = twToken.trim();
+    }
     onSave(next);
     setNvidia("");
     setOllama("");
@@ -234,6 +240,8 @@ function KeyCard({
     setXai("");
     setAwsId("");
     setAwsSecret("");
+    setTwSid("");
+    setTwToken("");
   }
 
   function clearSlot() {
@@ -248,6 +256,10 @@ function KeyCard({
       next.awsSecretAccessKey = "";
       next.awsRegion = "";
     }
+    if (id === "twilio") {
+      next.twilioAccountSid = "";
+      next.twilioAuthToken = "";
+    }
     onSave(next);
   }
 
@@ -260,8 +272,11 @@ function KeyCard({
         </div>
         <Badge tone={seated ? "sage" : "muted"}>{seated ? "saved" : "none"}</Badge>
       </div>
-      {seated && id !== "aws" ? (
+      {seated && id !== "aws" && id !== "twilio" ? (
         <p className="mt-3 font-mono text-sm text-muted">{maskSecret(vault[id])}</p>
+      ) : null}
+      {seated && id === "twilio" ? (
+        <p className="mt-3 font-mono text-sm text-muted">{maskSecret(vault.twilioAccountSid)}</p>
       ) : null}
       {seated && id === "aws" ? (
         <p className="mt-3 font-mono text-sm text-muted">
@@ -343,6 +358,25 @@ function KeyCard({
               onChange={(e) => setAwsRegion(e.target.value)}
               placeholder="Region (us-east-1)"
               aria-label="AWS region"
+            />
+          </>
+        ) : null}
+        {id === "twilio" ? (
+          <>
+            <Input
+              autoComplete="off"
+              value={twSid}
+              onChange={(e) => setTwSid(e.target.value)}
+              placeholder={vault.twilioAccountSid ? "Replace account SID" : "Twilio account SID (AC…)"}
+              aria-label="Twilio account SID"
+            />
+            <Input
+              type="password"
+              autoComplete="off"
+              value={twToken}
+              onChange={(e) => setTwToken(e.target.value)}
+              placeholder={vault.twilioAuthToken ? "Replace auth token" : "Twilio auth token"}
+              aria-label="Twilio auth token"
             />
           </>
         ) : null}

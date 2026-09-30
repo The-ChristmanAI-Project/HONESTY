@@ -86,6 +86,7 @@ export type StationSettings = {
   githubUser: string;
   githubOrg: string;
   pollSeconds: number;
+  trustedContact: string;
 };
 
 export type ManualWatch = {
