@@ -259,7 +259,7 @@ The moves it reads: asked for money · says they cannot be reached in person · 
 When it fires, the People row gets **this person may not exist** and a card in plain words:
 
 - **What it saw** — the person's own lines, quoted.
-- **What it means** — that this is the script, that it is not about her. If they claim military, it quotes what Army CID says a real soldier never needs.
+- **What it means** — that this is the script, that it is not about them. Men and women both get worked by this script. If they claim military, it quotes what Army CID says a real soldier never needs.
 - **What to do now** — do not send anything, do not tell them you checked, show this to someone you trust, report it.
 
 Two buttons run real checks from the browser:

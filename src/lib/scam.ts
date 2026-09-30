@@ -3,7 +3,7 @@
 // Everything else on this desk answers to the station owner. This section answers to
 // the person on the other end of a stranger's mail, text, or call: the one being told
 // the deployed soldier needs gift cards, the surgeon abroad needs a customs fee, keep it
-// between us, it has to be today. When it fires it speaks to her in plain words.
+// between us, it has to be today. When it fires it speaks to that person, man or woman, in plain words.
 //
 // What it does: reads the communications this desk can see for a stranger, names the
 // moves it saw, decides flag / case, and writes the three-line card. It can run two real
