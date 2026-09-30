@@ -106,7 +106,7 @@ export function buildReport(
     }
   }
 
-  lines.push("", "MAY NOT EXIST");
+  lines.push("", "AWARENISTIC — MAY NOT EXIST");
   const strangers = deriveUnknownPeople(events, owner, knownActors, namedAis, (login) =>
     isAiLogin(login, namedAis),
   );

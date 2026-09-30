@@ -248,9 +248,9 @@ That is the whole watch.
 
 ---
 
-## May not exist — the Scam Operation section
+## Awarenistic — aware for you
 
-Everything else on this desk answers to the station owner. This section answers to the person on the other end of a stranger's mail, text, or call: the one being told the deployed soldier needs gift cards, the surgeon abroad needs a customs fee, keep it between us, it has to be today.
+Awarenistic is a division of Honesty. Everything else on this desk answers to the station owner. Awarenistic answers to the person on the other end of a stranger's mail, text, or call: the one being told the deployed soldier needs gift cards, the surgeon abroad needs a customs fee, keep it between us, it has to be today.
 
 It reads what this desk can see for each person you don't know and names the moves it saw. The rule, stated once: one move is a flag. Three moves is a case. Money plus any other move is a case. A leave-papers ask, or being asked to receive or forward money or packages, is a case on its own.
 
@@ -271,9 +271,9 @@ Two buttons run real checks from the browser:
 
 **Show this to someone I trust** sends the card, with any checks run, to the mail or phone named on the Station page. Without one, it copies the card.
 
-What this section will not do: verify anyone's military service. The government does not hand that to civilians, and any product that says it does is lying. Reverse-image search is not in this section until there is a service we can name.
+What Awarenistic will not do: verify anyone's military service. The government does not hand that to civilians, and any product that says it does is lying. Reverse-image search is not in this section until there is a service we can name.
 
-Cases appear in reports under **MAY NOT EXIST**. Source: `src/lib/scam.ts`. Tests: `src/lib/scam.test.ts`.
+Cases appear in reports under **MAY NOT EXIST**. Awarenistic is free, same license as the rest of Honesty, and stays that way. Source: `src/lib/scam.ts`. Tests: `src/lib/scam.test.ts`.
 
 ---
 
@@ -291,7 +291,7 @@ HONESTY/
       local-agent.ts        # desk ↔ Local bridge
       datacenter.ts         # on your computer vs their computers
       people.ts             # unknown people + Who is this
-      scam.ts               # may not exist — reads the moves, writes the card, runs the checks
+      scam.ts               # Awarenistic — reads the moves, writes the card, runs the checks
       ai-scan.ts            # named AI catalog + matching
       store.ts              # station state (Zustand)
       github.ts             # GitHub pull

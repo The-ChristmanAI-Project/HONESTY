@@ -133,7 +133,7 @@ describe("scam operation — the case and the card", () => {
   it("writes plain text the report and a trusted person can read", () => {
     const c = deriveScamCase("James", thread)!;
     const text = shareText(c, ["The number is real.", "A VOIP line."]);
-    assert.ok(text.startsWith("From the Honesty desk."));
+    assert.ok(text.startsWith("From Awarenistic, on the Honesty desk."));
     assert.ok(text.includes("What it saw:"));
     assert.ok(text.includes("Checks run:"));
     assert.ok(cardText(c).length > 5);

@@ -1,4 +1,4 @@
-// Scam Operation — the part of Honesty whose duty runs to the person being worked.
+// AWARENISTIC — aware for you. The division of Honesty whose duty runs to the person being worked.
 //
 // Everything else on this desk answers to the station owner. This section answers to
 // the person on the other end of a stranger's mail, text, or call: the one being told
@@ -559,7 +559,7 @@ export async function checkMail(address: string): Promise<MailCheck> {
 /** Text of the card plus checks, ready to hand to a trusted person. */
 export function shareText(c: ScamCase, checks: string[] = []): string {
   const lines = [
-    "From the Honesty desk.",
+    "From Awarenistic, on the Honesty desk.",
     "",
     ...cardText(c),
   ];

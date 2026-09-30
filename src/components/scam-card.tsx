@@ -63,7 +63,7 @@ export function ScamCardView({ scamCase }: { scamCase: ScamCase }) {
   return (
     <div className="mt-3 rounded-md border border-danger/40 bg-surface-2 px-3 py-3">
       <div className="flex flex-wrap items-start justify-between gap-2">
-        <p className="text-lg font-medium">{card.heading}</p>
+        <div><p className="text-xs uppercase tracking-wide text-subtle">Awarenistic</p><p className="text-lg font-medium">{card.heading}</p></div>
         <Badge tone={tone}>{scamCase.level === "case" ? "may not exist" : "one thing to watch"}</Badge>
       </div>
 
