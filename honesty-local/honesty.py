@@ -115,7 +115,7 @@ lock = threading.Lock()
 state = {"armed": True, "started_at": datetime.now(timezone.utc).isoformat(), "platform": platform.system(),
          "machine": platform.node(), "running": [], "seen": [], "ledger": [], "last_scan": None,
          "models": [], "last_model_scan": None, "cloud_scan_at": 0.0, "model_note": None,
-         "note": "Honesty Local reads programs on this computer and which model is answering. Browser tabs are not programs.",
+         "note": "Honesty Local reads programs on this computer, which model is answering, and which outer intelligence is open in a browser tab. A tab is not a program, so tabs are listed on their own.",
          "conductor_url": None, "conductor_last_push": None, "conductor_last_error": None}
 _dns_cache = {"at": 0.0, "ips": {}}
 
@@ -988,7 +988,8 @@ def conductor_snapshot(include_private=True):
             standing += " Reasoning model: " + "; ".join(live_bits) + "."
         else:
             standing += " No datacenter model in use right now."
-        standing += " Browser tabs are not programs."
+        tabs = [f"{m.get('name')} in {m.get('via')}" for m in state["models"] if m.get("status") == "open"]
+        standing += (" Open in a browser: " + "; ".join(tabs) + ".") if tabs else " Nothing open in a browser tab that Honesty can read."
         return {"source": "honesty-local", "version": 1, "seated": True, "wing": "Honesty",
                 "hook": state["conductor_url"], "armed": state["armed"], "platform": state["platform"],
                 "machine": state["machine"], "last_scan": state["last_scan"],
@@ -1040,7 +1041,7 @@ def report_text(snap):
 PAGE = """<!DOCTYPE html><html><head><meta charset=\"utf-8\"/><title>Honesty Local</title>
 <style>body{margin:0;background:#0e0d0b;color:#efece4;font:16px/1.5 system-ui} .w{max-width:960px;margin:0 auto;padding:28px 20px} a{color:#8a9188}</style></head>
 <body><div class=\"w\"><p>Honesty Local</p><h1>Above all else.</h1>
-<p>Programs on this computer. Which model is answering. A browser tab is not Claude.</p>
+<p>Programs on this computer. Which model is answering. What is open in a browser tab, listed as open, never as a running program.</p>
 <p><a href=\"/conductor\">Conductor rail</a> · <a href=\"/api/status\">status</a> · <a href=\"/api/models\">models</a> · <a href=\"/api/report.txt\">report</a></p>
 <pre id=\"out\">loading</pre></div>
 <script>async function go(){const d=await (await fetch(\"/api/status\")).json();document.getElementById(\"out\").textContent=JSON.stringify(d,null,2);}go();setInterval(go,8000);</script></body></html>"""
