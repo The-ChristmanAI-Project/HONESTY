@@ -77,7 +77,7 @@ export function companyComputers(provider: string): string {
   const name = provider.trim();
   if (/^aws$/i.test(name)) return "Amazon's computers";
   if (/^ollama$/i.test(name)) return "Ollama's cloud";
-  if (/^gemini$/i.test(name)) return "Google's computers";
+  if (/^(google|gemini)$/i.test(name)) return "Google's computers";
   if (!name) return "their computers";
   return `${name}'s computers`;
 }

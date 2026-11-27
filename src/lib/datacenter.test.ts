@@ -51,6 +51,7 @@ describe("datacenter model watch", () => {
     assert.equal(modelsThrough(models, "Claude").length, 0);
     assert.equal(companyComputers("Anthropic"), "Anthropic's computers");
     assert.equal(companyComputers("Ollama"), "Ollama's cloud");
+    assert.equal(companyComputers("Google"), "Google's computers");
   });
 
   it("sends seated keys to Honesty Local without extra fields", () => {

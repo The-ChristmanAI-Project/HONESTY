@@ -25,13 +25,23 @@ HERE = Path(__file__).resolve().parent
 DATA = Path(os.environ.get("HONESTY_DATA_DIR", str(HERE))).resolve()
 DATA.mkdir(parents=True, exist_ok=True)
 LEDGER, HOOK, OUTBOX = DATA / "honesty-ledger.json", DATA / "conductor-hook.json", DATA / "conductor-outbox.json"
+# Google ships several separate agents. Each is named on its own so the ledger says which one
+# is running, never a blanket "Gemini". Order matters: the first match wins.
 CATALOG = [
+    ("Antigravity", ["antigravity", "agy"]), ("Jules", ["jules"]), ("Gemini CLI", ["gemini", "gemini-cli"]),
+    ("Google ADK", ["adk", "google-adk", "google.adk"]), ("Google Drive MCP", ["dfd_mcp_server"]),
+    ("Firebase MCP", []),
     ("Claude", ["claude", "anthropic"]), ("Copilot", ["copilot", "githubcopilot", "github copilot"]),
     ("Cursor", ["cursor"]), ("ChatGPT", ["chatgpt"]), ("Grok", ["grok"]), ("Ollama", ["ollama"]),
-    ("LM Studio", ["lm studio", "lmstudio"]), ("Gemini", ["gemini"]), ("Windsurf", ["windsurf"]),
+    ("LM Studio", ["lm studio", "lmstudio"]), ("Windsurf", ["windsurf"]),
     ("Aider", ["aider"]), ("Continue", ["continue.dev", "continue"]), ("Perplexity", ["perplexity"]),
-    ("Mistral", ["mistral"]), ("Codeium", ["codeium", "windsurf"]),
+    ("Mistral", ["mistral"]), ("Codeium", ["codeium"]),
 ]
+CATALOG_NAMES = {name for name, _ in CATALOG}
+GOOGLE_AGENTS = {"Antigravity", "Jules", "Gemini CLI", "Google ADK", "Google Drive MCP", "Firebase MCP"}
+# Programs that run someone else's script: the script, not the interpreter, is the program.
+INTERPRETERS = {"node", "nodejs", "bun", "deno", "python", "python3", "pythonw", "ruby", "npx", "uv", "uvx", "pipx"}
+BROWSERS = ("chrome", "chromium", "firefox", "safari", "msedge", "edge", "brave")
 DC_HOSTS = {
     "api.anthropic.com": "Anthropic", "claude.ai": "Anthropic",
     "api.openai.com": "OpenAI", "chatgpt.com": "OpenAI", "www.chatgpt.com": "OpenAI",
@@ -40,8 +50,12 @@ DC_HOSTS = {
     "grok.com": "xAI", "www.grok.com": "xAI", "assets.grok.com": "xAI",
     "integrate.api.nvidia.com": "NVIDIA", "inference.nvidia.com": "NVIDIA",
     "ai.api.nvidia.com": "NVIDIA", "api.nvcf.nvidia.com": "NVIDIA",
-    "generativelanguage.googleapis.com": "Gemini", "gemini.google.com": "Gemini",
-    "bard.google.com": "Gemini", "api.mistral.ai": "Mistral",
+    "generativelanguage.googleapis.com": "Google", "gemini.google.com": "Google",
+    "bard.google.com": "Google", "aiplatform.googleapis.com": "Google",
+    "cloudcode-pa.googleapis.com": "Google", "daily-cloudcode-pa.googleapis.com": "Google",
+    "jules.googleapis.com": "Google", "jules.google.com": "Google",
+    "aistudio.google.com": "Google", "notebooklm.google.com": "Google",
+    "api.mistral.ai": "Mistral",
     "api.groq.com": "Groq", "openrouter.ai": "OpenRouter", "ollama.com": "Ollama",
 }
 BROWSER_VIA = {
@@ -52,17 +66,22 @@ BROWSER_VIA = {
 DC_PREFIX = (
     ("2607:6bc0:", "Anthropic"),
     ("160.79.104.", "Anthropic"),
-    ("2001:4860:4826:", "Gemini"),
-    ("2001:4860:4840:", "Gemini"),
-    ("2001:4860:4841:", "Gemini"),
+    ("2001:4860:4826:", "Google"),
+    ("2001:4860:4840:", "Google"),
+    ("2001:4860:4841:", "Google"),
 )
+# Google serves every product from the same front-end addresses, so a Google address alone
+# cannot say Gemini is answering: Chrome reaches it for mail, search and sync. A Google
+# connection is only named when a named AI program on this computer made it.
+SHARED_FRONT = {"Google"}
 APP_COMPANY = {
-    "Claude": "Anthropic", "ChatGPT": "OpenAI", "Grok": "xAI", "Gemini": "Gemini",
+    "Claude": "Anthropic", "ChatGPT": "OpenAI", "Grok": "xAI",
+    **{name: "Google" for name in GOOGLE_AGENTS},
 }
 REASONING_MARK = ("o1", "o3", "o4", "r1", "reason", "think", "nemotron", "opus", "sonnet",
-                  "grok-3", "grok-4", "grok-2", "gpt-5")
+                  "grok-3", "grok-4", "grok-2", "gpt-5", "gemini-2.5-pro", "gemini-3")
 FLAGSHIP_MARK = ("gpt-4o", "gpt-4.1", "gpt-5", "claude-3", "claude-sonnet", "claude-opus",
-                 "claude-haiku", "llama-3.1-405", "llama-3.3-70", "llama-4", "gemini-2",
+                 "claude-haiku", "llama-3.1-405", "llama-3.3-70", "llama-4", "gemini-2", "gemini-3",
                  "mistral-large", "qwen2.5", "deepseek", "nemotron", "grok")
 NIM_PORTS = (8000, 8001, 9000, 1234)
 CLOUD_EVERY = 60
@@ -156,22 +175,70 @@ def list_processes():
                 if parts and parts[0]:
                     rows.append({"pid": parts[1] if len(parts) > 1 else "", "name": parts[0].replace('"', ""), "cmd": parts[0]})
             return rows
-        raw = subprocess.check_output(["ps", "-ax", "-o", "pid=,comm=,args="], text=True, stderr=subprocess.DEVNULL)
+        # args only: macOS cuts comm at 16 characters and at the first space, which turned
+        # "/Applications/Google Chrome.app/..." into a program called "Google".
+        raw = subprocess.check_output(["ps", "-ax", "-o", "pid=,args="], text=True, stderr=subprocess.DEVNULL)
         rows = []
         for line in raw.splitlines():
-            m = re.match(r"^\s*(\d+)\s+(\S+)\s+(.*)$", line.strip())
-            if m: rows.append({"pid": m.group(1), "name": os.path.basename(m.group(2)), "cmd": m.group(3)[:240]})
+            m = re.match(r"^\s*(\d+)\s+(.*)$", line.strip())
+            if not m: continue
+            exe, rest = split_exe(m.group(2))
+            rows.append({"pid": m.group(1), "name": os.path.basename(exe), "exe": exe, "cmd": m.group(2)[:240],
+                         "rest": rest[:400]})
         return rows
     except (OSError, subprocess.CalledProcessError):
         return []
 
+def split_exe(args):
+    """The executable path at the front of a command line, even when the path has spaces."""
+    args = (args or "").strip()
+    if not args.startswith("/"):
+        head, _, rest = args.partition(" ")
+        return head, rest
+    tokens = args.split(" ")
+    best = 1
+    for i in range(1, len(tokens) + 1):
+        if os.path.exists(" ".join(tokens[:i])): best = i
+    return " ".join(tokens[:best]), " ".join(tokens[best:])
+
+def _home_free(path):
+    """A path with the home folder taken off, so a user named Claude is not a program named Claude."""
+    path = path or ""
+    home = str(Path.home())
+    if home and path.startswith(home): path = path[len(home):]
+    return re.sub(r"^/(Users|home)/[^/]+", "", path)
+
+def identity(proc):
+    """What a process is: its executable, and for an interpreter the script it runs.
+    Never the rest of the arguments, or a grep for a name would count as that program."""
+    exe = proc.get("exe") or proc.get("name") or ""
+    parts = [_home_free(exe), proc.get("name") or ""]
+    rest = (proc.get("rest") or "").split()
+    base = os.path.basename(exe).lower()
+    base = re.sub(r"\.exe$", "", base)
+    if base in INTERPRETERS or re.match(r"^python3(\.\d+)?$", base):
+        i = 0
+        while i < len(rest):
+            tok = rest[i]
+            if tok in ("-c", "-e", "--eval", "-p"): rest = []; break
+            if tok == "-m" and i + 1 < len(rest): parts.append(rest[i + 1]); rest = rest[i + 2:]; break
+            if tok.startswith("-"): i += 1; continue
+            parts.append(_home_free(tok)); rest = rest[i + 1:]; break
+        else:
+            rest = []
+    return " ".join(parts).lower(), [t.lower() for t in rest]
+
+def _word(alias, hay):
+    return re.search(r"(?<![a-z0-9])" + re.escape(alias) + r"(?![a-z0-9])", hay) is not None
+
 def match_ai(proc):
-    hay = f"{proc.get('name','')} {proc.get('cmd','')}".lower()
-    browser = any(b in hay for b in ("chrome", "firefox", "safari", "msedge", "edge", "brave", "chromium"))
+    hay, rest = identity(proc)
+    if re.search(r"(?<![a-z0-9])firebase(?![a-z0-9])", hay) and "mcp" in rest:
+        return "Firebase MCP"
+    if any(_word(b, hay) for b in BROWSERS): return None
     for name, aliases in CATALOG:
         for alias in [name.lower(), *aliases]:
-            if alias and alias in hay:
-                if browser: continue
+            if alias and _word(alias, hay):
                 if alias == "grok" and "grok_seat" in hay: continue
                 return name
     return None
@@ -192,6 +259,7 @@ def host_provider(host):
     for prefix, provider in DC_PREFIX:
         if hay.startswith(prefix): return provider
     if "bedrock-runtime" in hay or hay.startswith("bedrock."): return "AWS"
+    if hay.endswith("-aiplatform.googleapis.com"): return "Google"  # Vertex AI regional endpoints
     for name, provider in DC_HOSTS.items():
         if hay == name or hay.endswith("." + name): return provider
     return None
@@ -297,28 +365,34 @@ def remote_host(remote):
         return remote.split("]", 1)[0].strip("[")
     return remote.rsplit(":", 1)[0].strip("[]")
 
+def wire_row(conn, ips, pid_names):
+    """One connection, read honestly: which company's computers, through which program."""
+    remote = conn.get("remote") or ""
+    hostport = remote_host(remote)
+    host = ips.get(hostport) or hostport
+    pname = (conn.get("name") or "").lower().replace("\\x20", " ")
+    via = pid_names.get(str(conn.get("pid") or "")) or match_ai({"name": conn.get("name") or "", "exe": conn.get("name") or ""})
+    provider = host_provider(host)
+    if not provider and via in APP_COMPANY and hostport not in ("127.0.0.1", "::1", "localhost"):
+        provider = APP_COMPANY[via]
+    if not provider: return None
+    if provider in SHARED_FRONT and via not in CATALOG_NAMES:
+        return None  # a browser or an unnamed program reaching a shared front end proves nothing
+    if not via:
+        via = BROWSER_VIA.get(pname.split(" ")[0]) or BROWSER_VIA.get(pname)
+    return model_row(f"{provider.lower()}-live", f"{provider} live session", provider,
+                     "datacenter", "in_use", "wire", host=host, via=via, at=now_iso())
+
 def probe_wire(pid_names):
     ips = resolve_dc_ips()
     found, seen = [], set()
     for conn in list_connections():
-        remote = conn.get("remote") or ""
-        hostport = remote_host(remote)
-        host = ips.get(hostport) or hostport
-        pname = (conn.get("name") or "").lower()
-        via = match_ai({"name": conn.get("name") or "", "cmd": conn.get("name") or ""})
-        if not via: via = pid_names.get(str(conn.get("pid") or ""))
-        provider = host_provider(host)
-        if not provider and via in APP_COMPANY and hostport not in ("127.0.0.1", "::1", "localhost"):
-            provider = APP_COMPANY[via]
-        if not provider: continue
-        if not via:
-            via = BROWSER_VIA.get(pname)
-        key = (provider, host)
+        row = wire_row(conn, ips, pid_names)
+        if not row: continue
+        key = (row["provider"], row["host"], row.get("via"))
         if key in seen: continue
         seen.add(key)
-        row = model_row(f"{provider.lower()}-live", f"{provider} live session", provider,
-                        "datacenter", "in_use", "wire", host=host, via=via, at=now_iso())
-        if row: found.append(row)
+        found.append(row)
     return found
 
 def probe_ollama():
@@ -392,6 +466,8 @@ def walk_models(obj, acc, stamps=None, skip_keys=None):
                     prev = stamps.get(mid.lower())
                     if not prev or (parse_stamp(iso) or 0) >= (parse_stamp(prev) or 0):
                         stamps[mid.lower()] = iso
+            if k == "model" and isinstance(val, dict) and isinstance(val.get("name"), str) and val["name"].strip():
+                acc.append(val["name"].strip())  # Gemini CLI keeps {"model": {"name": ...}}
             if k in ("selectedmodelbyrole",) and isinstance(val, dict):
                 for role, mid in val.items():
                     if isinstance(mid, str) and mid.strip() and str(role).lower() in ("chat", "edit", "apply", "agent", "reason", "reasoning"):
@@ -411,6 +487,7 @@ def read_selected_models(running=None):
         home / ".continue/config.json",
         home / ".claude.json",
         home / ".cursor/argv.json",
+        home / ".gemini/settings.json",
     ]
     found = []
     best = {}  # via -> (ts, mid, provider, at)
@@ -419,7 +496,9 @@ def read_selected_models(running=None):
         if data is None: continue
         names, stamps = [], {}
         walk_models(data, names, stamps)
-        via = "Cursor" if "Cursor" in str(path) else ("Continue" if "continue" in str(path).lower() else ("Claude" if "claude" in str(path).lower() else "config"))
+        low = str(path).lower()
+        via = "Cursor" if "Cursor" in str(path) else ("Continue" if "continue" in low else (
+            "Gemini CLI" if "/.gemini/" in low else ("Claude" if "claude" in low else "config")))
         if via.lower() not in running and via != "config":
             continue
         for mid in names:
@@ -430,7 +509,8 @@ def read_selected_models(running=None):
                 "OpenAI" if mid.lower().startswith(("gpt-", "o1", "o3", "o4")) else (
                 "xAI" if "grok" in mid.lower() else (
                 "NVIDIA" if "nvidia" in mid.lower() or "nemotron" in mid.lower() else (
-                "Ollama" if ":" in mid and "/" not in mid else "config"))))
+                "Ollama" if ":" in mid and "/" not in mid else (
+                "Google" if "gemini" in mid.lower() or "gemma" in mid.lower() else "config")))))
             prev = best.get(via)
             if not prev or ts >= prev[0]:
                 best[via] = (ts, mid, provider, at)
@@ -994,8 +1074,11 @@ def self_test():
     assert host_provider("api.anthropic.com") == "Anthropic"
     assert host_provider("2607:6bc0::10") == "Anthropic"
     assert host_provider("claude.ai") == "Anthropic"
-    assert host_provider("gemini.google.com") == "Gemini"
-    assert host_provider("2001:4860:4826:200::") == "Gemini"
+    assert host_provider("gemini.google.com") == "Google"
+    assert host_provider("2001:4860:4826:200::") == "Google"
+    assert host_provider("cloudcode-pa.googleapis.com") == "Google"
+    assert host_provider("us-central1-aiplatform.googleapis.com") == "Google"
+    assert host_provider("jules.googleapis.com") == "Google"
     assert host_provider("api.openai.com") == "OpenAI"
     assert host_provider("chatgpt.com") == "OpenAI"
     assert host_provider("chat.openai.com") == "OpenAI"
@@ -1012,6 +1095,42 @@ def self_test():
     assert match_ai({"name": "Google Chrome", "cmd": "Google Chrome https://chatgpt.com"}) is None
     assert match_ai({"name": "ChatGPT", "cmd": "/Applications/ChatGPT.app/Contents/MacOS/ChatGPT"}) == "ChatGPT"
     assert match_ai({"name": "Claude", "cmd": "/Applications/Claude.app/Contents/MacOS/Claude"}) == "Claude"
+    # Each Google agent by name; a command that only mentions one is not that program.
+    ag = {"name": "language_server", "exe": "/Applications/Antigravity.app/Contents/Resources/bin/language_server",
+          "rest": "--standalone --override_ide_name antigravity"}
+    assert match_ai(ag) == "Antigravity"
+    assert match_ai({"name": "Electron", "exe": "/Applications/Antigravity.app/Contents/MacOS/Electron", "rest": ""}) == "Antigravity"
+    assert match_ai({"name": "node", "exe": "/usr/local/bin/node", "rest": "/usr/local/bin/gemini -p hi"}) == "Gemini CLI"
+    assert match_ai({"name": "node", "exe": "/usr/local/bin/node",
+                     "rest": "/usr/local/lib/node_modules/@google/jules/run.js new"}) == "Jules"
+    assert match_ai({"name": "jules", "exe": "/usr/local/bin/jules", "rest": "remote list"}) == "Jules"
+    assert match_ai({"name": "python3", "exe": "/usr/bin/python3", "rest": "-m google.adk.cli web"}) == "Google ADK"
+    assert match_ai({"name": "dfd_mcp_server", "exe": "/Applications/Google Drive.app/Contents/MacOS/dfd_mcp_server", "rest": ""}) == "Google Drive MCP"
+    assert match_ai({"name": "node", "exe": "/usr/local/bin/node", "rest": "/usr/local/bin/firebase mcp"}) == "Firebase MCP"
+    assert match_ai({"name": "node", "exe": "/usr/local/bin/node", "rest": "/usr/local/bin/firebase deploy"}) is None
+    assert match_ai({"name": "grep", "exe": "grep", "rest": "-i gemini"}) is None
+    assert match_ai({"name": "zsh", "exe": "/bin/zsh", "rest": "-c ps -ax | grep -i antigravity"}) is None
+    assert match_ai({"name": "python3", "exe": "/usr/bin/python3", "rest": "-c import gemini"}) is None
+    assert match_ai({"name": "python3", "exe": "/usr/bin/python3", "rest": "/home/claude/tool.py"}) is None
+    assert match_ai({"name": "Code Helper", "exe": "/Applications/Visual Studio Code.app/Contents/Frameworks/Code Helper",
+                     "rest": "--enable-features=knowledge"}) is None
+    assert match_ai({"name": "Google Chrome", "exe": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+                     "rest": "--restart"}) is None
+    exe, rest = split_exe("/bin/zsh -c echo hi")
+    assert exe == "/bin/zsh" and rest == "-c echo hi"
+    # A Google front end reached by Chrome is not Gemini answering; reached by a named agent, it is Google.
+    ips = {}
+    chrome = wire_row({"pid": "1", "name": "Google", "remote": "[2001:4860:4826:200::1]:443"}, ips, {})
+    assert chrome is None
+    cli = wire_row({"pid": "2", "name": "node", "remote": "[2001:4860:4826:200::1]:443"}, ips, {"2": "Gemini CLI"})
+    assert cli and cli["provider"] == "Google" and cli["via"] == "Gemini CLI"
+    claude_vertex = wire_row({"pid": "3", "name": "claude", "remote": "[2001:4860:4840:1::2]:443"}, ips, {"3": "Claude"})
+    assert claude_vertex and claude_vertex["provider"] == "Google" and claude_vertex["via"] == "Claude"
+    anth = wire_row({"pid": "4", "name": "Google", "remote": "160.79.104.10:443"}, ips, {})
+    assert anth and anth["provider"] == "Anthropic" and anth["via"] == "Chrome"
+    gnames, gstamps = [], {}
+    walk_models({"model": {"name": "gemini-2.5-pro"}}, gnames, gstamps)
+    assert "gemini-2.5-pro" in gnames and model_role("gemini-2.5-pro") == "reasoning"
     parsed = connection_from_lsof(
         "Google 10826 EverettN 30u IPv6 0x1 0t0 TCP "
         "[2607:fb91::1]:52202->[2606:4700:4408::ac40:9bd1]:443 (ESTABLISHED)"

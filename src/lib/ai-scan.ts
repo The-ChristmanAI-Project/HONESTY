@@ -6,6 +6,11 @@ export const AI_CATALOG: { name: string; aliases: string[] }[] = [
   { name: "Copilot", aliases: ["copilot", "copilot-swe-agent", "github-copilot"] },
   { name: "Claude", aliases: ["claude", "anthropic"] },
   { name: "ChatGPT", aliases: ["chatgpt", "openai", "gpt-4", "gpt4"] },
+  // Google's agents, each by its own name. Specific entries sit before "Gemini": first match wins.
+  { name: "Jules", aliases: ["google-labs-jules", "google-labs-jules[bot]", "jules"] },
+  { name: "Gemini Code Assist", aliases: ["gemini-code-assist", "gemini-code-assist[bot]"] },
+  { name: "Antigravity", aliases: ["antigravity"] },
+  { name: "Gemini CLI", aliases: ["gemini-cli"] },
   { name: "Gemini", aliases: ["gemini", "bard"] },
   { name: "Cursor", aliases: ["cursor", "cursor-ai"] },
   { name: "Ollama", aliases: ["ollama"] },
