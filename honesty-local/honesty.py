@@ -79,9 +79,11 @@ APP_COMPANY = {
     **{name: "Google" for name in GOOGLE_AGENTS},
 }
 REASONING_MARK = ("o1", "o3", "o4", "r1", "reason", "think", "nemotron", "opus", "sonnet",
-                  "grok-3", "grok-4", "grok-2", "gpt-5", "gemini-2.5-pro", "gemini-3")
+                  "grok-3", "grok-4", "grok-2", "gpt-5", "gemini-2.5-pro", "gemini-3",
+                  # Gemini 4: Argon and Carbon reason deep, Neon sits between them and Hydrogen.
+                  "gemini-4-argon", "gemini-4-carbon", "gemini-4-neon")
 FLAGSHIP_MARK = ("gpt-4o", "gpt-4.1", "gpt-5", "claude-3", "claude-sonnet", "claude-opus",
-                 "claude-haiku", "llama-3.1-405", "llama-3.3-70", "llama-4", "gemini-2", "gemini-3",
+                 "claude-haiku", "llama-3.1-405", "llama-3.3-70", "llama-4", "gemini-2", "gemini-3", "gemini-4",
                  "mistral-large", "qwen2.5", "deepseek", "nemotron", "grok")
 NIM_PORTS = (8000, 8001, 9000, 1234)
 CLOUD_EVERY = 60
@@ -1131,6 +1133,9 @@ def self_test():
     gnames, gstamps = [], {}
     walk_models({"model": {"name": "gemini-2.5-pro"}}, gnames, gstamps)
     assert "gemini-2.5-pro" in gnames and model_role("gemini-2.5-pro") == "reasoning"
+    for mid in ("gemini-4-carbon", "gemini-4-argon", "gemini-4-neon"):
+        assert model_role(mid) == "reasoning" and keep_reachable(mid), mid
+    assert model_role("gemini-4-hydrogen") == "chat" and keep_reachable("gemini-4-hydrogen")
     parsed = connection_from_lsof(
         "Google 10826 EverettN 30u IPv6 0x1 0t0 TCP "
         "[2607:fb91::1]:52202->[2606:4700:4408::ac40:9bd1]:443 (ESTABLISHED)"
