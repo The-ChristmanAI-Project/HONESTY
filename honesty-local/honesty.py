@@ -85,6 +85,20 @@ REASONING_MARK = ("o1", "o3", "o4", "r1", "reason", "think", "nemotron", "opus",
 FLAGSHIP_MARK = ("gpt-4o", "gpt-4.1", "gpt-5", "claude-3", "claude-sonnet", "claude-opus",
                  "claude-haiku", "llama-3.1-405", "llama-3.3-70", "llama-4", "gemini-2", "gemini-3", "gemini-4",
                  "mistral-large", "qwen2.5", "deepseek", "nemotron", "grok")
+# Outer intelligence used in a browser tab. A tab is not a program, so these never go in
+# RUNNING NOW; they are listed as open in a browser. Google serves Gemini from the same
+# addresses as mail and search, so the open tab, not the wire, is what names Gemini.
+TAB_AI = {
+    "gemini.google.com": ("Gemini", "Google"), "aistudio.google.com": ("AI Studio", "Google"),
+    "notebooklm.google.com": ("NotebookLM", "Google"), "jules.google.com": ("Jules", "Google"),
+    "claude.ai": ("Claude", "Anthropic"), "chatgpt.com": ("ChatGPT", "OpenAI"),
+    "chat.openai.com": ("ChatGPT", "OpenAI"), "grok.com": ("Grok", "xAI"),
+    "perplexity.ai": ("Perplexity", "Perplexity"), "chat.mistral.ai": ("Le Chat", "Mistral"),
+    "copilot.microsoft.com": ("Copilot", "Microsoft"), "chat.deepseek.com": ("DeepSeek", "DeepSeek"),
+}
+# macOS browsers that answer "URL of every tab of every window". Firefox does not, and says so.
+TAB_BROWSERS = (("Google Chrome", "Chrome"), ("Brave Browser", "Brave"), ("Microsoft Edge", "Edge"),
+                ("Arc", "Arc"), ("Safari", "Safari"), ("Chromium", "Chromium"))
 NIM_PORTS = (8000, 8001, 9000, 1234)
 CLOUD_EVERY = 60
 CURRENT_HOURS = 2.0
@@ -101,7 +115,7 @@ lock = threading.Lock()
 state = {"armed": True, "started_at": datetime.now(timezone.utc).isoformat(), "platform": platform.system(),
          "machine": platform.node(), "running": [], "seen": [], "ledger": [], "last_scan": None,
          "models": [], "last_model_scan": None, "cloud_scan_at": 0.0, "model_note": None,
-         "note": "Honesty Local reads programs on this computer and which model is answering. Browser tabs are not programs.",
+         "note": "Honesty Local reads programs on this computer, which model is answering, and which outer intelligence is open in a browser tab. A tab is not a program, so tabs are listed on their own.",
          "conductor_url": None, "conductor_last_push": None, "conductor_last_error": None}
 _dns_cache = {"at": 0.0, "ips": {}}
 
@@ -367,7 +381,60 @@ def remote_host(remote):
         return remote.split("]", 1)[0].strip("[")
     return remote.rsplit(":", 1)[0].strip("[]")
 
-def wire_row(conn, ips, pid_names):
+def program_label(proc):
+    """A plain name for a program that is not on the AI watch list, so a connection is never
+    left without one. For node or python it is the project the script lives in."""
+    exe = proc.get("exe") or proc.get("name") or ""
+    base = re.sub(r"\.exe$", "", os.path.basename(exe).lower())
+    if base in INTERPRETERS or re.match(r"^python3(\.\d+)?$", base):
+        for tok in (proc.get("rest") or "").split():
+            if tok.startswith("-"): continue
+            if "/node_modules/" in tok:
+                project = os.path.basename(tok.split("/node_modules/")[0])
+                return f"{project} ({os.path.basename(tok)})" if project else os.path.basename(tok)
+            return os.path.basename(tok) or base
+        return base
+    return os.path.basename(exe) or proc.get("name") or ""
+
+def parse_tab_urls(raw):
+    """URLs out of osascript's flat answer: 'https://a, https://b'."""
+    return [u for u in re.findall(r"[a-z][a-z0-9+.-]*://[^\s,]+", raw or "", re.I)]
+
+def tab_rows(browser, urls):
+    found, seen = [], set()
+    for url in urls:
+        host = (urlparse(url).hostname or "").lower()
+        if host.startswith("www."): host = host[4:]
+        hit = TAB_AI.get(host)
+        if not hit or hit[0] in seen: continue
+        seen.add(hit[0])
+        name, provider = hit
+        row = model_row(f"{name.lower()}-tab", name, provider, "datacenter", "open", "tab",
+                        host=host, via=browser, at=now_iso())
+        if row: found.append(row)
+    return found
+
+def read_browser_tabs():
+    """Which outer intelligence is open in a browser tab right now. macOS only; it asks each
+    running browser and never opens one. A browser that refuses is named in the notes."""
+    if platform.system() != "Darwin": return [], []
+    found, notes = [], []
+    for app, short in TAB_BROWSERS:
+        script = (f'if application "{app}" is running then\n'
+                  f'tell application "{app}" to get URL of every tab of every window\nend if')
+        try:
+            done = subprocess.run(["osascript", "-e", script], capture_output=True, text=True, timeout=4)
+        except (OSError, subprocess.TimeoutExpired):
+            continue
+        if done.returncode != 0:
+            if "-1743" in (done.stderr or ""):
+                notes.append(f"{short} tabs could not be read: allow Honesty to control {short} in "
+                             "System Settings, Privacy & Security, Automation.")
+            continue
+        found.extend(tab_rows(short, parse_tab_urls(done.stdout)))
+    return found, notes
+
+def wire_row(conn, ips, pid_names, pid_labels=None):
     """One connection, read honestly: which company's computers, through which program."""
     remote = conn.get("remote") or ""
     hostport = remote_host(remote)
@@ -382,14 +449,16 @@ def wire_row(conn, ips, pid_names):
         return None  # a browser or an unnamed program reaching a shared front end proves nothing
     if not via:
         via = BROWSER_VIA.get(pname.split(" ")[0]) or BROWSER_VIA.get(pname)
+    if not via:
+        via = (pid_labels or {}).get(str(conn.get("pid") or "")) or None
     return model_row(f"{provider.lower()}-live", f"{provider} live session", provider,
                      "datacenter", "in_use", "wire", host=host, via=via, at=now_iso())
 
-def probe_wire(pid_names):
+def probe_wire(pid_names, pid_labels=None):
     ips = resolve_dc_ips()
     found, seen = [], set()
     for conn in list_connections():
-        row = wire_row(conn, ips, pid_names)
+        row = wire_row(conn, ips, pid_names, pid_labels)
         if not row: continue
         key = (row["provider"], row["host"], row.get("via"))
         if key in seen: continue
@@ -687,7 +756,7 @@ def probe_cloud(keys):
     return found, notes
 
 def merge_models(rows):
-    rank = {"in_use": 4, "recent": 3, "configured": 2, "reachable": 1}
+    rank = {"in_use": 5, "open": 4, "recent": 3, "configured": 2, "reachable": 1}
     by_key, by_provider = {}, {}
     for row in rows:
         if not row: continue
@@ -722,20 +791,22 @@ def merge_models(rows):
     out.sort(key=lambda m: (-rank.get(m["status"], 0), 0 if m["role"] == "reasoning" else 1, m["provider"], m["name"]))
     return out[:40]
 
-def scan_models(keys=None, force_cloud=False, pid_names=None, running=None):
+def scan_models(keys=None, force_cloud=False, pid_names=None, running=None, pid_labels=None):
     found = []
     found.extend(probe_ollama())
     found.extend(probe_openai_compat_local())
-    found.extend(probe_wire(pid_names or {}))
+    found.extend(probe_wire(pid_names or {}, pid_labels))
     found.extend(read_selected_models(running))
-    notes = []
+    tabs, notes = read_browser_tabs()
+    found.extend(tabs)
     now = time.time()
     with lock: last_cloud = state["cloud_scan_at"]
     use_keys = keys if keys else env_keys()
     has_keys = any(use_keys.get(k) for k in ("nvidia", "openai", "anthropic", "ollama", "xai")) or (
         use_keys.get("awsAccessKeyId") and use_keys.get("awsSecretAccessKey"))
     if has_keys and (force_cloud or keys or now - last_cloud >= CLOUD_EVERY):
-        cloud, notes = probe_cloud(use_keys)
+        cloud, cloud_notes = probe_cloud(use_keys)
+        notes.extend(cloud_notes)
         found.extend(cloud)
         with lock: state["cloud_scan_at"] = now
     merged = merge_models(found)
@@ -748,16 +819,22 @@ def scan_models(keys=None, force_cloud=False, pid_names=None, running=None):
             for item in merged:
                 key = (item.get("provider"), item.get("id"), item.get("status"))
                 if key in prior: continue
-                if item.get("status") != "in_use": continue
+                if item.get("status") not in ("in_use", "open"): continue
                 place = "datacenter" if item.get("where") == "datacenter" else "local"
                 where = "at the datacenter" if place == "datacenter" else "on this computer"
                 via = f" via {item['via']}" if item.get("via") else ""
+                summary = (f"{item['name']} is open in {item.get('via') or 'a browser'}"
+                           if item.get("status") == "open"
+                           else f"{item['name']} is the {item['role']} model {where}{via}")
                 state["ledger"].append({
                     "at": at, "kind": "model", "name": item["provider"],
-                    "source": place,
-                    "summary": f"{item['name']} is the {item['role']} model {where}{via}",
+                    "source": place, "summary": summary,
                 })
             for provider, mid, status in sorted(prior - now_set):
+                if status == "open":
+                    state["ledger"].append({"at": at, "kind": "model", "name": provider, "source": "datacenter",
+                                            "summary": f"{mid.removesuffix('-tab')} is no longer open in a browser"})
+                    continue
                 if status != "in_use": continue
                 old = next((m for m in prior_rows if (m.get("provider"), m.get("id"), m.get("status")) == (provider, mid, status)), None)
                 place = "datacenter" if (old or {}).get("where") == "datacenter" else "local"
@@ -774,6 +851,7 @@ def scan_models(keys=None, force_cloud=False, pid_names=None, running=None):
 
 def scan_once():
     procs = list_processes(); found = {}
+    pid_labels = {str(p["pid"]): program_label(p) for p in procs}
     for proc in procs:
         name = match_ai(proc)
         if not name: continue
@@ -803,7 +881,7 @@ def scan_once():
         for item in running:
             for pid in item.get("pids") or []:
                 pid_names[str(pid)] = item["name"]
-    scan_models(pid_names=pid_names, running=[item["name"] for item in running])
+    scan_models(pid_names=pid_names, running=[item["name"] for item in running], pid_labels=pid_labels)
     with lock:
         snap = {"armed": state["armed"], "platform": state["platform"], "machine": state["machine"],
                 "running": list(state["running"]), "seen": list(state["seen"]), "ledger": list(state["ledger"][-80:]),
@@ -910,7 +988,8 @@ def conductor_snapshot(include_private=True):
             standing += " Reasoning model: " + "; ".join(live_bits) + "."
         else:
             standing += " No datacenter model in use right now."
-        standing += " Browser tabs are not programs."
+        tabs = [f"{m.get('name')} in {m.get('via')}" for m in state["models"] if m.get("status") == "open"]
+        standing += (" Open in a browser: " + "; ".join(tabs) + ".") if tabs else " Nothing open in a browser tab that Honesty can read."
         return {"source": "honesty-local", "version": 1, "seated": True, "wing": "Honesty",
                 "hook": state["conductor_url"], "armed": state["armed"], "platform": state["platform"],
                 "machine": state["machine"], "last_scan": state["last_scan"],
@@ -949,13 +1028,20 @@ def report_text(snap):
             where = "datacenter" if item.get("where") == "datacenter" else "this computer"
             via = f" via {item['via']}" if item.get("via") else ""
             lines.append(f"  {item.get('name')} · {item.get('provider')} · {item.get('status')} · {item.get('role')} · {where}{via}")
+    tabs = [m for m in (snap.get("models") or []) if m.get("status") == "open"]
+    lines += ["", "OPEN IN A BROWSER"]
+    if not tabs: lines.append("  No outer intelligence open in a browser tab that Honesty can read.")
+    else:
+        for item in tabs:
+            lines.append(f"  {item.get('name')} · {item.get('provider')} · {item.get('host')} · in {item.get('via')}"
+                         " · the tab does not say which model")
     if snap.get("model_note"): lines += ["", snap["model_note"]]
     return "\n".join(lines) + "\n"
 
 PAGE = """<!DOCTYPE html><html><head><meta charset=\"utf-8\"/><title>Honesty Local</title>
 <style>body{margin:0;background:#0e0d0b;color:#efece4;font:16px/1.5 system-ui} .w{max-width:960px;margin:0 auto;padding:28px 20px} a{color:#8a9188}</style></head>
 <body><div class=\"w\"><p>Honesty Local</p><h1>Above all else.</h1>
-<p>Programs on this computer. Which model is answering. A browser tab is not Claude.</p>
+<p>Programs on this computer. Which model is answering. What is open in a browser tab, listed as open, never as a running program.</p>
 <p><a href=\"/conductor\">Conductor rail</a> · <a href=\"/api/status\">status</a> · <a href=\"/api/models\">models</a> · <a href=\"/api/report.txt\">report</a></p>
 <pre id=\"out\">loading</pre></div>
 <script>async function go(){const d=await (await fetch(\"/api/status\")).json();document.getElementById(\"out\").textContent=JSON.stringify(d,null,2);}go();setInterval(go,8000);</script></body></html>"""
@@ -1118,6 +1204,26 @@ def self_test():
                      "rest": "--enable-features=knowledge"}) is None
     assert match_ai({"name": "Google Chrome", "exe": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
                      "rest": "--restart"}) is None
+    # Browser tabs: named by the page they are on; a mail tab is not Gemini.
+    urls = parse_tab_urls("https://mail.google.com/mail/u/0/, https://gemini.google.com/app/85d9, "
+                          "https://aistudio.google.com/u/1/prompts/1Q, https://www.perplexity.ai/search/x, "
+                          "https://gemini.google.com/app/other")
+    trows = tab_rows("Chrome", urls)
+    assert [(r["name"], r["provider"], r["status"], r["via"]) for r in trows] == [
+        ("Gemini", "Google", "open", "Chrome"), ("AI Studio", "Google", "open", "Chrome"),
+        ("Perplexity", "Perplexity", "open", "Chrome")], trows
+    assert tab_rows("Safari", parse_tab_urls("https://mail.google.com/, https://www.google.com/search?q=gemini")) == []
+    assert parse_tab_urls("") == []
+    snap_text = report_text({"models": trows, "running": []})
+    assert "OPEN IN A BROWSER" in snap_text and "Gemini · Google · gemini.google.com · in Chrome" in snap_text
+    # A connection from a program not on the watch list still says which program it is.
+    vite = {"pid": "60028", "name": "node", "exe": "/usr/local/bin/node",
+            "rest": "/Users/x/AUDITOR/node_modules/.bin/vite dev --port 4444"}
+    assert program_label(vite) == "AUDITOR (vite)"
+    assert program_label({"name": "curl", "exe": "/usr/bin/curl", "rest": "https://x"}) == "curl"
+    nv = wire_row({"pid": "60028", "name": "node", "remote": "integrate.api.nvidia.com:443"},
+                  {}, {}, {"60028": "AUDITOR (vite)"})
+    assert nv and nv["provider"] == "NVIDIA" and nv["via"] == "AUDITOR (vite)"
     exe, rest = split_exe("/bin/zsh -c echo hi")
     assert exe == "/bin/zsh" and rest == "-c echo hi"
     # A Google front end reached by Chrome is not Gemini answering; reached by a named agent, it is Google.

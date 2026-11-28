@@ -110,7 +110,7 @@ export type DatacenterModel = {
   provider: string;
   where: "local" | "datacenter";
   role: "reasoning" | "chat";
-  status: "in_use" | "recent" | "reachable" | "configured";
+  status: "in_use" | "open" | "recent" | "reachable" | "configured";
   source: string;
   host?: string | null;
   via?: string | null;

@@ -90,6 +90,33 @@ describe("datacenter model watch", () => {
     assert.equal(modelLine?.counterpart, "claude-sonnet-4-5");
   });
 
+  it("names a Gemini tab as open in the browser, never as answering", () => {
+    const gemini: DatacenterModel = {
+      id: "gemini-tab",
+      name: "Gemini",
+      provider: "Google",
+      where: "datacenter",
+      role: "chat",
+      status: "open",
+      source: "tab",
+      host: "gemini.google.com",
+      via: "Chrome",
+    };
+    assert.equal(statusLabel(gemini), "open in Chrome");
+    assert.equal(liveModels([gemini]).length, 0);
+    const events = eventsFromLocal({
+      armed: true,
+      platform: "Darwin",
+      machine: "Everett.lan",
+      last_scan: "2026-11-27T20:30:00.000Z",
+      running: [],
+      models: [gemini],
+      ledger: [],
+    });
+    const line = events.find((event) => event.id.startsWith("local-model-"));
+    assert.equal(line?.summary, "Gemini is open in Chrome on Google's computers");
+  });
+
   it("does not put a leftover pick on the live ledger", () => {
     const snap: LocalSnapshot = {
       armed: true,

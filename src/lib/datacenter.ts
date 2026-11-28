@@ -61,6 +61,8 @@ export function statusLabel(model: Model): string {
   if (model.status === "recent") {
     return model.where === "datacenter" ? "recently answering" : "recently on this computer";
   }
+  // Open in a browser tab. The page names the service; it does not say which model.
+  if (model.status === "open") return model.via ? `open in ${model.via}` : "open in a browser";
   if (model.status === "configured") return "picked";
   return "available";
 }
